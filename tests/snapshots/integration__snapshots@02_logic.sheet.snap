@@ -1,6 +1,5 @@
 ---
 source: tests/integration.rs
-assertion_line: 95
 expression: output
 input_file: tests/scripts/02_logic.sheet
 ---
