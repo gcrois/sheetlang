@@ -44,6 +44,7 @@ pub enum Value {
     Dict(Vec<(String, Value)>),
     Range(i64, i64),
     Lambda(Vec<String>, Box<Expr>),
+    Error(String),
 }
 
 impl fmt::Display for Value {
@@ -53,10 +54,29 @@ impl fmt::Display for Value {
             Value::Int(n) => write!(f, "{}", n),
             Value::Bool(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "\"{}\"", s),
-            Value::Array(a) => write!(f, "{:?}", a),
-            Value::Dict(d) => write!(f, "{:?}", d),
+            Value::Array(a) => {
+                write!(f, "[")?;
+                for (i, v) in a.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", v)?;
+                }
+                write!(f, "]")
+            }
+            Value::Dict(d) => {
+                write!(f, "{{ ")?;
+                for (i, (k, v)) in d.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}: {}", k, v)?;
+                }
+                write!(f, " }}")
+            }
             Value::Range(s, e) => write!(f, "{}..{}", s, e),
             Value::Lambda(_, _) => write!(f, "<fn>"),
+            Value::Error(e) => write!(f, "#ERR: {}", e),
         }
     }
 }

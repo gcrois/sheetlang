@@ -30,37 +30,37 @@ E1 = E1 || 100           // = 100
 --- PARSE & EXECUTION ---
 
 [Tick 1]
-A1: empty
-B1: empty
-C1: empty
-D1: empty
+A1: true
+B1: true
+C1: true
+D1: 2
 E1: 100
-A2: empty
-B2: empty
-C2: empty
+A2: false
+B2: false
+C2: false
 D2: 5
-C3: empty
+C3: true
 
 [Tick 2]
-A1: empty
-B1: empty
-C1: empty
-D1: empty
+A1: true
+B1: true
+C1: true
+D1: 2
 E1: 100
-A2: empty
-B2: empty
-C2: empty
+A2: false
+B2: false
+C2: false
 D2: 5
-C3: empty
+C3: true
 
 --- CHECKS ---
-❌ A1: FAILED (Expected 'true', got 'empty')
-❌ A2: FAILED (Expected 'false', got 'empty')
-❌ B1: FAILED (Expected 'true', got 'empty')
-❌ B2: FAILED (Expected 'false', got 'empty')
-❌ C1: FAILED (Expected 'true', got 'empty')
-❌ C2: FAILED (Expected 'false', got 'empty')
-❌ C3: FAILED (Expected 'true', got 'empty')
-❌ D1: FAILED (Expected '2', got 'empty')
+✅ A1: Matches (true)
+✅ A2: Matches (false)
+✅ B1: Matches (true)
+✅ B2: Matches (false)
+✅ C1: Matches (true)
+✅ C2: Matches (false)
+✅ C3: Matches (true)
+✅ D1: Matches (2)
 ✅ D2: Matches (5)
 ✅ E1: Matches (100)

@@ -31,8 +31,8 @@ A7 = 5 * 0               // = 0
 A1: 30
 A2: 14
 A3: 20
-A4: empty
-A5: empty
+A4: 5
+A5: 5
 A6: 6
 A7: 0
 
@@ -40,8 +40,8 @@ A7: 0
 A1: 30
 A2: 14
 A3: 20
-A4: empty
-A5: empty
+A4: 5
+A5: 5
 A6: 6
 A7: 0
 
@@ -49,7 +49,7 @@ A7: 0
 ✅ A1: Matches (30)
 ✅ A2: Matches (14)
 ✅ A3: Matches (20)
-❌ A4: FAILED (Expected '5', got 'empty')
-❌ A5: FAILED (Expected '5', got 'empty')
+✅ A4: Matches (5)
+✅ A5: Matches (5)
 ✅ A6: Matches (6)
 ✅ A7: Matches (0)

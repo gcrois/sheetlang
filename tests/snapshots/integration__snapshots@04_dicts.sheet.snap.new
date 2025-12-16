@@ -23,24 +23,24 @@ C2 = C1.meta.id          // = 55
 --- PARSE & EXECUTION ---
 
 [Tick 1]
-A1: empty
+A1: { x: 10, y: 20 }
 B1: empty
-C1: empty
+C1: { meta: { id: 55 } }
 B2: empty
 C2: empty
 B3: empty
 
 [Tick 2]
-A1: empty
-B1: empty
-C1: empty
-B2: empty
-C2: empty
+A1: { x: 10, y: 20 }
+B1: 10
+C1: { meta: { id: 55 } }
+B2: 20
+C2: 55
 B3: empty
 
 --- CHECKS ---
-❌ A1: FAILED (Expected '{ x: 10, y: 20 }', got 'empty')
-❌ B1: FAILED (Expected '10', got 'empty')
-❌ B2: FAILED (Expected '20', got 'empty')
+✅ A1: Matches ({ x: 10, y: 20 })
+✅ B1: Matches (10)
+✅ B2: Matches (20)
 ✅ B3: Matches (empty)
-❌ C2: FAILED (Expected '55', got 'empty')
+✅ C2: Matches (55)

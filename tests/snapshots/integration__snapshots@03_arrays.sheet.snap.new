@@ -30,27 +30,27 @@ C3 = C1[0][0]            // = 10
 --- PARSE & EXECUTION ---
 
 [Tick 1]
-A1: [Int(1), Int(2), Int(3)]
+A1: [1, 2, 3]
 B1: empty
-C1: [Array([Int(10), Int(20)]), Array([Int(30), Int(40)])]
+C1: [[10, 20], [30, 40]]
 B2: empty
 C2: empty
 B3: empty
 C3: empty
 
 [Tick 2]
-A1: [Int(1), Int(2), Int(3)]
-B1: empty
-C1: [Array([Int(10), Int(20)]), Array([Int(30), Int(40)])]
-B2: empty
-C2: empty
+A1: [1, 2, 3]
+B1: 1
+C1: [[10, 20], [30, 40]]
+B2: 3
+C2: [30, 40]
 B3: empty
-C3: empty
+C3: 10
 
 --- CHECKS ---
-❌ A1: FAILED (Expected '[1, 2, 3]', got '[Int(1), Int(2), Int(3)]')
-❌ B1: FAILED (Expected '1', got 'empty')
-❌ B2: FAILED (Expected '3', got 'empty')
+✅ A1: Matches ([1, 2, 3])
+✅ B1: Matches (1)
+✅ B2: Matches (3)
 ✅ B3: Matches (empty)
-❌ C2: FAILED (Expected '[30, 40]', got 'empty')
-❌ C3: FAILED (Expected '10', got 'empty')
+✅ C2: Matches ([30, 40])
+✅ C3: Matches (10)

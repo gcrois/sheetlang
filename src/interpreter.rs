@@ -59,7 +59,6 @@ impl Engine {
     }
 
     pub fn tick(&mut self) {
-        // Fix: Removed 'mut' here
         let new_prev = self.state_curr.clone();
 
         self.state_prev = new_prev;
@@ -85,11 +84,18 @@ impl Engine {
             Expr::Literal(v) => v.clone(),
 
             Expr::Ref(name) => {
+                if name == "true" {
+                    return Value::Bool(true);
+                }
+                if name == "false" {
+                    return Value::Bool(false);
+                }
                 if let Some(v) = locals.get(name) {
                     return v.clone();
                 }
                 if let Some(c) = Coord::from_str(name) {
-                    return grid.get(&c).cloned().unwrap_or(Value::Empty);
+                    // Treat empty/missing cells as 0 for references, like spreadsheets
+                    return grid.get(&c).cloned().unwrap_or(Value::Int(0));
                 }
                 Value::Empty
             }
@@ -107,6 +113,30 @@ impl Engine {
                 let l = self.eval(lhs, grid, self_coord, locals);
                 let r = self.eval(rhs, grid, self_coord, locals);
                 self.apply_op(op, l, r)
+            }
+
+            Expr::Unary(op, expr) => {
+                let val = self.eval(expr, grid, self_coord, locals);
+                match op {
+                    Op::Not => Value::Bool(!self.is_truthy(&val)),
+                    Op::Sub => {
+                        if let Value::Int(n) = val {
+                            Value::Int(-n)
+                        } else {
+                            Value::Empty
+                        }
+                    }
+                    _ => val,
+                }
+            }
+
+            Expr::If(cond, then_branch, else_branch) => {
+                let c = self.eval(cond, grid, self_coord, locals);
+                if self.is_truthy(&c) {
+                    self.eval(then_branch, grid, self_coord, locals)
+                } else {
+                    self.eval(else_branch, grid, self_coord, locals)
+                }
             }
 
             Expr::Lambda(args, body) => Value::Lambda(args.clone(), body.clone()),
@@ -139,25 +169,127 @@ impl Engine {
                 Value::Array(v)
             }
 
-            _ => Value::Empty,
+            Expr::Dict(items) => {
+                let mut d = Vec::new();
+                for (k, v_expr) in items {
+                    let v = self.eval(v_expr, grid, self_coord, locals);
+                    d.push((k.clone(), v));
+                }
+                Value::Dict(d)
+            }
+
+            Expr::Range(start, end) => {
+                let s = self.eval(start, grid, self_coord, locals);
+                let e = self.eval(end, grid, self_coord, locals);
+                if let (Value::Int(s_val), Value::Int(e_val)) = (s, e) {
+                    Value::Range(s_val, e_val)
+                } else {
+                    Value::Empty
+                }
+            }
+
+            Expr::Member(obj_expr, key) => {
+                let obj = self.eval(obj_expr, grid, self_coord, locals);
+                if let Value::Dict(pairs) = obj {
+                    for (k, v) in pairs {
+                        if k == *key {
+                            return v;
+                        }
+                    }
+                }
+                Value::Empty
+            }
+
+            Expr::Index(obj_expr, idx_expr) => {
+                let obj = self.eval(obj_expr, grid, self_coord, locals);
+                let idx = self.eval(idx_expr, grid, self_coord, locals);
+                match (obj, idx) {
+                    (Value::Array(arr), Value::Int(i)) => {
+                        if i >= 0 && (i as usize) < arr.len() {
+                            arr[i as usize].clone()
+                        } else {
+                            Value::Empty
+                        }
+                    }
+                    (Value::Dict(pairs), Value::String(s)) => {
+                        for (k, v) in pairs {
+                            if k == s {
+                                return v;
+                            }
+                        }
+                        Value::Empty
+                    }
+                    _ => Value::Empty,
+                }
+            }
+
+            Expr::Assign(_, _) => Value::Empty,
         }
     }
 
     fn apply_op(&self, op: &Op, l: Value, r: Value) -> Value {
         match (op, l, r) {
-            (Op::Add, Value::Int(a), Value::Int(b)) => Value::Int(a + b),
-            (Op::Sub, Value::Int(a), Value::Int(b)) => Value::Int(a - b),
-            (Op::Mul, Value::Int(a), Value::Int(b)) => Value::Int(a * b),
-            (Op::Div, Value::Int(a), Value::Int(b)) => Value::Int(a / b),
-            (Op::Or, a, b) => {
-                let a_true = self.is_truthy(&a);
-                if a_true {
-                    a
+            (Op::Add, l, r) => match (l, r) {
+                (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
+                (Value::String(a), Value::String(b)) => Value::String(a + &b),
+                (Value::Empty, _) | (_, Value::Empty) => Value::Empty,
+                _ => Value::Error("Invalid types for Add".into()),
+            },
+
+            (Op::Sub, l, r) => match (l, r) {
+                (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
+                (Value::Empty, _) | (_, Value::Empty) => Value::Empty,
+                _ => Value::Error("Invalid types for Sub".into()),
+            },
+
+            (Op::Mul, l, r) => match (l, r) {
+                (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
+                (Value::Empty, _) | (_, Value::Empty) => Value::Empty,
+                _ => Value::Error("Invalid types for Mul".into()),
+            },
+
+            (Op::Div, l, r) => match (l, r) {
+                (Value::Int(a), Value::Int(b)) => {
+                    if b == 0 {
+                        Value::Error("Division by zero".into())
+                    } else {
+                        Value::Int(a / b)
+                    }
+                }
+                (Value::Empty, _) | (_, Value::Empty) => Value::Empty,
+                _ => Value::Error("Invalid types for Div".into()),
+            },
+
+            (Op::Eq, a, b) => Value::Bool(a == b),
+            (Op::Neq, a, b) => Value::Bool(a != b),
+
+            (Op::Gt, l, r) => match (l, r) {
+                (Value::Int(a), Value::Int(b)) => Value::Bool(a > b),
+                (Value::String(a), Value::String(b)) => Value::Bool(a > b),
+                _ => Value::Bool(false), // Fallback
+            },
+
+            (Op::Lt, l, r) => match (l, r) {
+                (Value::Int(a), Value::Int(b)) => Value::Bool(a < b),
+                (Value::String(a), Value::String(b)) => Value::Bool(a < b),
+                _ => Value::Bool(false), // Fallback
+            },
+
+            (Op::And, l, r) => {
+                if self.is_truthy(&l) {
+                    r
                 } else {
-                    b
+                    l
                 }
             }
-            _ => Value::Empty,
+            (Op::Or, l, r) => {
+                if self.is_truthy(&l) {
+                    l
+                } else {
+                    r
+                }
+            }
+            (Op::Not, l, _) => Value::Bool(!self.is_truthy(&l)),
         }
     }
 
