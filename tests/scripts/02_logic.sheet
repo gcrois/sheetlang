@@ -1,0 +1,21 @@
+// Greater Than / Less Than
+A1 = 10 > 5              // = true
+A2 = 10 < 5              // = false
+
+// Equality
+B1 = 5 == 5              // = true
+B2 = 5 != 5              // = false
+
+// Logical AND / OR
+C1 = true && true        // = true
+C2 = true && false       // = false
+C3 = false || true       // = true
+
+// Truthiness (Numbers != 0 are true)
+D1 = 1 && 2              // = 2
+D2 = 0 || 5              // = 5
+
+// Initialization Pattern (Null Coalescing)
+// E1 is empty on Tick 1 (treated as falsy), so it becomes 100.
+// On Tick 2, E1 is 100 (truthy), so it stays 100.
+E1 = E1 || 100           // = 100

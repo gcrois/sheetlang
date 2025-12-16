@@ -1,0 +1,56 @@
+---
+source: tests/integration.rs
+assertion_line: 95
+expression: output
+input_file: tests/scripts/03_arrays.sheet
+---
+--- CODE ---
+// Simple Array
+A1 = [1, 2, 3]           // = [1, 2, 3]
+
+// Array Indexing (0-based)
+B1 = A1[0]               // = 1
+B2 = A1[2]               // = 3
+
+// Out of bounds (Returns empty)
+B3 = A1[99]              // = empty
+
+// Nested Arrays
+C1 = [[10, 20], [30, 40]]
+// Indexing nested array (requires Tick 2 to resolve C1 first if referencing)
+// But here we are indexing the literal structure essentially
+C2 = C1[1]               // = [30, 40]
+
+// Chained Indexing (if supported by parser/engine logic)
+// Note: Depending on your AST, C1[1][0] might need C1 to be resolved first.
+// Since C1 is assigned in Tick 1, C3 reads the value of C1 from Tick 1 (which was empty).
+// So C3 will likely be empty at Tick 1 and correct at Tick 2.
+C3 = C1[0][0]            // = 10
+
+--- PARSE & EXECUTION ---
+
+[Tick 1]
+A1: [Int(1), Int(2), Int(3)]
+B1: empty
+C1: [Array([Int(10), Int(20)]), Array([Int(30), Int(40)])]
+B2: empty
+C2: empty
+B3: empty
+C3: empty
+
+[Tick 2]
+A1: [Int(1), Int(2), Int(3)]
+B1: empty
+C1: [Array([Int(10), Int(20)]), Array([Int(30), Int(40)])]
+B2: empty
+C2: empty
+B3: empty
+C3: empty
+
+--- CHECKS ---
+❌ A1: FAILED (Expected '[1, 2, 3]', got '[Int(1), Int(2), Int(3)]')
+❌ B1: FAILED (Expected '1', got 'empty')
+❌ B2: FAILED (Expected '3', got 'empty')
+✅ B3: Matches (empty)
+❌ C2: FAILED (Expected '[30, 40]', got 'empty')
+❌ C3: FAILED (Expected '10', got 'empty')

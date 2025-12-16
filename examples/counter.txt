@@ -1,6 +1,0 @@
-set(A1, 10)
-set(A2, ref(A1) + 1)
-tick
-ref(A2)
-tick
-ref(A2)

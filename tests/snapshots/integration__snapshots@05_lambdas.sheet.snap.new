@@ -1,0 +1,53 @@
+---
+source: tests/integration.rs
+assertion_line: 95
+expression: output
+input_file: tests/scripts/05_lambdas.sheet
+---
+--- CODE ---
+// Identity Function
+A1 = (x) => x
+B1 = A1(42)              // = 42
+
+// Two Arguments
+A2 = (a, b) => a + b
+B2 = A2(10, 20)          // = 30
+
+// Shadowing / Scope
+// The argument 'x' should shadow any global 'x' if it existed
+A3 = (x) => x * 2
+B3 = A3(5)               // = 10
+
+// Higher Order Concept (Passing value to function)
+// C1 defines the adder
+C1 = (v) => v + 1
+// C2 applies it
+C2 = C1(99)              // = 100
+
+--- PARSE & EXECUTION ---
+
+[Tick 1]
+A1: <fn>
+B1: empty
+C1: <fn>
+A2: <fn>
+B2: empty
+C2: empty
+A3: <fn>
+B3: empty
+
+[Tick 2]
+A1: <fn>
+B1: 42
+C1: <fn>
+A2: <fn>
+B2: 30
+C2: 100
+A3: <fn>
+B3: 10
+
+--- CHECKS ---
+✅ B1: Matches (42)
+✅ B2: Matches (30)
+✅ B3: Matches (10)
+✅ C2: Matches (100)

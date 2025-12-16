@@ -1,0 +1,21 @@
+// Simple Array
+A1 = [1, 2, 3]           // = [1, 2, 3]
+
+// Array Indexing (0-based)
+B1 = A1[0]               // = 1
+B2 = A1[2]               // = 3
+
+// Out of bounds (Returns empty)
+B3 = A1[99]              // = empty
+
+// Nested Arrays
+C1 = [[10, 20], [30, 40]]
+// Indexing nested array (requires Tick 2 to resolve C1 first if referencing)
+// But here we are indexing the literal structure essentially
+C2 = C1[1]               // = [30, 40]
+
+// Chained Indexing (if supported by parser/engine logic)
+// Note: Depending on your AST, C1[1][0] might need C1 to be resolved first.
+// Since C1 is assigned in Tick 1, C3 reads the value of C1 from Tick 1 (which was empty).
+// So C3 will likely be empty at Tick 1 and correct at Tick 2.
+C3 = C1[0][0]            // = 10

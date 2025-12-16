@@ -1,0 +1,14 @@
+// Simple Dictionary
+A1 = { x: 10, y: 20 }    // = { x: 10, y: 20 }
+
+// Member Access (Dot notation)
+B1 = A1.x                // = 10
+B2 = A1.y                // = 20
+
+// Member Access (non-existent key)
+B3 = A1.z                // = empty
+
+// Nested Dictionaries
+C1 = { meta: { id: 55 } }
+// Access nested
+C2 = C1.meta.id          // = 55

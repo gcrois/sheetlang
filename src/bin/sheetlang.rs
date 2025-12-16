@@ -1,9 +1,4 @@
-mod ast;
-mod interpreter;
-mod lexer;
-mod parser;
-
-use ariadne::{Color, Label, Report, ReportKind, Source};
+use ariadne::{Color, Label, Report, ReportKind, Source}; // Cleaned up unused imports
 use ast::Expr;
 use chumsky::input::Stream;
 use chumsky::prelude::*;
@@ -11,6 +6,7 @@ use interpreter::Engine;
 use lexer::Token;
 use logos::Logos;
 use rustyline::DefaultEditor;
+use sheetlang::{ast, interpreter, lexer, parser};
 
 fn main() {
     let mut rl = DefaultEditor::new().unwrap();
@@ -67,7 +63,6 @@ fn main() {
                     },
                     Err(errors) => {
                         for err in errors {
-                            // Fix: Explicitly specify Range<usize> type and use Label/Color
                             Report::<std::ops::Range<usize>>::build(
                                 ReportKind::Error,
                                 (),
@@ -90,6 +85,3 @@ fn main() {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

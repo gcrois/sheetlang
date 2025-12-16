@@ -1,0 +1,46 @@
+---
+source: tests/integration.rs
+assertion_line: 95
+expression: output
+input_file: tests/scripts/04_dicts.sheet
+---
+--- CODE ---
+// Simple Dictionary
+A1 = { x: 10, y: 20 }    // = { x: 10, y: 20 }
+
+// Member Access (Dot notation)
+B1 = A1.x                // = 10
+B2 = A1.y                // = 20
+
+// Member Access (non-existent key)
+B3 = A1.z                // = empty
+
+// Nested Dictionaries
+C1 = { meta: { id: 55 } }
+// Access nested
+C2 = C1.meta.id          // = 55
+
+--- PARSE & EXECUTION ---
+
+[Tick 1]
+A1: empty
+B1: empty
+C1: empty
+B2: empty
+C2: empty
+B3: empty
+
+[Tick 2]
+A1: empty
+B1: empty
+C1: empty
+B2: empty
+C2: empty
+B3: empty
+
+--- CHECKS ---
+❌ A1: FAILED (Expected '{ x: 10, y: 20 }', got 'empty')
+❌ B1: FAILED (Expected '10', got 'empty')
+❌ B2: FAILED (Expected '20', got 'empty')
+✅ B3: Matches (empty)
+❌ C2: FAILED (Expected '55', got 'empty')
