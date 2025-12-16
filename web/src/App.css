@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+body, html {
+    padding: 0;
+    margin: 0;
+    background-color: red;
+}
