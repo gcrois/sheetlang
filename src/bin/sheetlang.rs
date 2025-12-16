@@ -12,7 +12,7 @@ fn main() {
     let mut rl = DefaultEditor::new().unwrap();
     let mut engine = Engine::new();
 
-    println!("SheetLang 0.2.0 - Tick Engine");
+    println!("SheetLang");
     println!("Commands: 'tick', 'show', or assignments 'A1 = ...'");
 
     loop {
@@ -63,20 +63,16 @@ fn main() {
                     },
                     Err(errors) => {
                         for err in errors {
-                            Report::<std::ops::Range<usize>>::build(
-                                ReportKind::Error,
-                                (),
-                                err.span().start,
-                            )
-                            .with_message(err.to_string())
-                            .with_label(
-                                Label::new(err.span().into_range())
-                                    .with_message(err.reason().to_string())
-                                    .with_color(Color::Red),
-                            )
-                            .finish()
-                            .print(Source::from(line_str))
-                            .unwrap();
+                            Report::build(ReportKind::Error, ((), err.span().into_range()))
+                                .with_message(err.to_string())
+                                .with_label(
+                                    Label::new(((), err.span().into_range()))
+                                        .with_message(err.reason().to_string())
+                                        .with_color(Color::Red),
+                                )
+                                .finish()
+                                .print(Source::from(line_str))
+                                .unwrap();
                         }
                     }
                 }

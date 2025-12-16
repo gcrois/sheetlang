@@ -15,6 +15,7 @@ fn test_snapshots() {
 
         let mut engine = Engine::new();
         let mut output = String::new();
+        
         // Store (CellName, ExpectedString)
         let mut expectations: Vec<(String, String)> = Vec::new();
 
