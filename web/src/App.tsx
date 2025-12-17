@@ -15,7 +15,6 @@ function App() {
 		let resizeObserver: ResizeObserver | null = null;
 
 		const sheet = new Sheet();
-		sheet.set_formula("A1", "10");
 		sheetRef.current = sheet;
 
 		let currentLine = "";
@@ -26,7 +25,7 @@ function App() {
 			const ord = data.charCodeAt(0);
 
 			if (data === "\x1b[A") {
-				// Up Arrow logic...
+				// Up Arrow
 				const history = historyRef.current;
 				let idx = historyIndexRef.current;
 				if (history.length > 0) {
@@ -38,7 +37,7 @@ function App() {
 				}
 				return;
 			} else if (data === "\x1b[B") {
-				// Down Arrow logic...
+				// Down Arrow
 				const history = historyRef.current;
 				let idx = historyIndexRef.current;
 				if (idx > -1) {
@@ -86,8 +85,6 @@ function App() {
 			}
 		};
 
-		// --- 2. Event Listeners ---
-
 		const handleKeydownCapture = (e: KeyboardEvent) => {
 			const isModifier = e.metaKey || e.ctrlKey;
 
@@ -129,9 +126,26 @@ function App() {
 			e.stopPropagation();
 
 			const text = e.clipboardData?.getData("text");
-			if (text) {
-				const cleanText = text.replace(/[\r\n]+/g, " ");
-				handleInput(cleanText);
+			if (text && tmp_term) {
+				// Split by newlines and process each line
+				const lines = text.split(/\r?\n/);
+
+				for (let i = 0; i < lines.length; i++) {
+					const line = lines[i].trim();
+					if (line) {
+						// Write the line to the terminal
+						tmp_term.write(line);
+						currentLine = line;
+
+						// Simulate Enter press to execute the command
+						tmp_term.write("\r\n");
+						historyRef.current.push(line);
+						historyIndexRef.current = -1;
+						processCommand(line, tmp_term, sheetRef.current);
+						currentLine = "";
+						tmp_term.write(promptStr);
+					}
+				}
 			}
 		};
 
@@ -157,8 +171,10 @@ function App() {
 			tmp_term.loadAddon(fitAddon);
 			tmp_term.open(terminalRef.current!);
 
-            tmp_term.writeln("SheetLang Terminal");
-			tmp_term.writeln("https://g.regory.dev/blog/langjam-gamejam/day_-1/");
+			tmp_term.writeln("SheetLang Terminal");
+			tmp_term.writeln("A reactive spreadsheet programming language");
+			tmp_term.writeln("");
+			tmp_term.writeln("Type 'help' for available commands");
 			tmp_term.write("\r\n" + promptStr);
 
 			if (terminalRef.current) {
@@ -200,8 +216,64 @@ function App() {
 		sheet: Sheet | null
 	) => {
 		if (!input.trim()) return;
+		if (!sheet) {
+			terminal.writeln("Error: Sheet not initialized");
+			return;
+		}
+
+		const trimmed = input.trim();
+
 		try {
-			terminal.writeln(`Executing: ${input}`);
+			// Handle 'tick' command
+			if (trimmed === "tick") {
+				sheet.tick();
+				terminal.writeln("Tick processed.");
+				return;
+			}
+
+			// Handle 'show' command
+			if (trimmed === "show") {
+				terminal.writeln("Current State:");
+				const values = sheet.get_all_values();
+				if (values.trim()) {
+					// Split by lines and write each one separately
+					const lines = values.split("\n").filter((line) => line.trim());
+					lines.forEach((line) => terminal.writeln(line));
+				} else {
+					terminal.writeln("(empty)");
+				}
+				return;
+			}
+
+			// Handle 'help' command
+			if (trimmed === "help") {
+				terminal.writeln("SheetLang Commands:");
+				terminal.writeln("  A1 = <formula>  - Set a formula for a cell");
+				terminal.writeln("  tick            - Advance the engine one step");
+				terminal.writeln("  show            - Display all cell values");
+				terminal.writeln("  help            - Show this help message");
+				terminal.writeln("  exit            - (not implemented in web)");
+				terminal.writeln("");
+				terminal.writeln("Examples:");
+				terminal.writeln("  A1 = 10");
+				terminal.writeln("  B1 = A1 + 5");
+				terminal.writeln("  tick");
+				terminal.writeln("  show");
+				return;
+			}
+
+			// Try to parse as assignment (A1 = ...)
+			const assignMatch = trimmed.match(/^([A-Z]\d+)\s*=\s*(.+)$/);
+			if (assignMatch) {
+				const [, cell, formula] = assignMatch;
+				sheet.set_formula(cell, formula);
+				terminal.writeln(`Formula set for ${cell}`);
+				return;
+			}
+
+			// If we get here, unknown command
+			terminal.writeln(`Unknown command: ${trimmed}`);
+			terminal.writeln(`Type 'help' for available commands`);
 		} catch (e) {
 			terminal.writeln(`Error: ${e}`);
 		}

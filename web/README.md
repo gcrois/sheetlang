@@ -1,73 +1,101 @@
-# React + TypeScript + Vite
+# SheetLang Web Terminal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A web-based terminal interface for SheetLang, running via WebAssembly.
 
-Currently, two official plugins are available:
+See it live here: https://sheetlang.pages.dev
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Overview
 
-## React Compiler
+This is a browser-based REPL for SheetLang that provides the same functionality as the native CLI, powered by WebAssembly. It features a terminal interface built with [ghostty-web](https://github.com/mitchellh/ghostty) and React.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+- Full SheetLang interpreter running in the browser
+- Terminal-style interface with command history
+- Keyboard shortcuts (arrow keys for history, Ctrl+C, Ctrl+U)
+- No backend required - runs entirely client-side
+- Fast and responsive thanks to WASM
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Development
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Prerequisites
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Node.js (v18+)
+- pnpm
+- Rust & wasm-pack (for building the WASM module)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Setup
+
+1. Build the WASM module from the project root:
+
+```bash
+wasm-pack build --target web --out-dir web/pkg
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Install dependencies:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+cd web
+pnpm install
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+3. Start the development server:
+
+```bash
+pnpm dev
+```
+
+4. Open your browser to the URL shown (usually http://localhost:5173)
+
+### Building for Production
+
+```bash
+# Build WASM (from project root)
+wasm-pack build --target web --out-dir web/pkg
+
+# Build web app
+cd web
+pnpm build
+
+# Preview production build
+pnpm preview
+```
+
+## Usage
+
+Once the terminal loads, you can use the following commands:
+
+### Commands
+
+- `A1 = <formula>` - Set a formula for a cell
+- `tick` - Advance the engine one step
+- `show` - Display all cell values
+- `help` - Show available commands
+
+### Example Session
+
+```
+$ A1 = 10
+Formula set for A1
+$ B1 = A1 * 2
+Formula set for B1
+$ tick
+Tick processed.
+$ show
+Current State:
+A1: 10
+B1: 20
+```
+
+### WASM Integration
+
+The SheetLang interpreter is compiled to WebAssembly and exposed via the `Sheet` class:
+
+```typescript
+import { Sheet } from "../../pkg";
+
+const sheet = new Sheet();
+sheet.set_formula("A1", "10");
+sheet.tick();
+const values = sheet.get_all_values();
 ```

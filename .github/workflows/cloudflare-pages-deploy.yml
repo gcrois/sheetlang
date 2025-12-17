@@ -1,0 +1,77 @@
+name: Deploy
+
+on:
+    push:
+        branches: ["main"]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    deployments: write
+
+concurrency:
+    group: "pages"
+    cancel-in-progress: true
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            # ─── pnpm cache ───────────────────────────────────────────────────────────
+            - name: Cache pnpm store
+              uses: actions/cache@v4
+              with:
+                  path: ~/.pnpm-store
+                  key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pnpm-
+
+            # ─── Cargo cache (registry + git index + build artefacts) ────────────────
+            - name: Cache cargo
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-
+
+            # ─── Toolchains ──────────────────────────────────────────────────────────
+            - uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: nightly
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "21"
+
+            - uses: pnpm/action-setup@v3
+
+            # ─── Build WASM module ───────────────────────────────────────────────
+            - name: Build WASM module
+              run: |
+                  wasm-pack build
+
+            # ─── Build web ──────────────────────────────────────────────────────
+            - name: Change to web directory
+              run: cd web
+
+            - name: Install deps
+              run: pnpm install --no-frozen-lockfile
+
+            - name: Build
+              run: pnpm build
+
+            - name: Deploy to Cloudflare Pages
+              uses: cloudflare/wrangler-action@v3
+              with:
+                  apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                  command: >
+                      pages deploy ./dist
+                      --project-name sheetland
+                      --branch main
