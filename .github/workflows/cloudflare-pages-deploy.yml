@@ -59,7 +59,7 @@ jobs:
 
             # ─── Build WASM module ───────────────────────────────────────────────
             - name: Build WASM module
-              run: wasm-pack build --target web
+              run: wasm-pack build
 
             # ─── Build web ──────────────────────────────────────────────────────
             - name: Install deps

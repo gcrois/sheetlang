@@ -1,0 +1,43 @@
+<svg width="748" height="512" viewBox="0 0 748 512" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .pixel-art {
+      image-rendering: optimizeSpeed;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      -ms-interpolation-mode: nearest-neighbor;
+    }
+
+    .title {
+      font-family: Inter, Arial;
+      font-size: 30px;
+      font-weight: bold;
+      fill: black;
+    }
+
+    .subtitle {
+      font-family: Inter, Arial;
+      font-size: 24px;
+      fill: black;
+      text-anchor: middle;
+    }
+  </style>
+
+  <rect x="0" y="0" width="748" height="512" fill="white" />
+
+  <text x="374" y="70" text-anchor="middle" class="title">SheetLang Console</text>
+
+  <image 
+    href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD8AAAAwAQMAAACcxzBJAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAZQTFRFAAAAAAAApWe5zwAAAAJ0Uk5TAP9bkSK1AAABgUlEQVR4nC3QzUsCQRgG8Pdt19Yk2lWCPESKp04VRFQqBl7q6B8gRLeMPi+VILZWSlCQBeUhobrUoZsQ1aFIKujUxy0oiUBIiUolaS1de0eby/x4ZoZ5eRD+F1Y3IY2AczKAtx+B2xgG8chK6LoGh3qJUDsSRqWsRRDvzYLskRD6ti0tQ1OEcon3hrIM2dbHesKcq90U6yBMhME8JGsV/JRAq0CJxzKUNUWIu3B2/1ljPw8c40C3zLt3sIeew2IyUuND4WkrOL3Aj6Jp9yzYe85/oJj1B23WpQ/ki6rGfZJSaVSVd3t61mnCvC5RZ6Tf8bshjRJByBte1mQjJb+WOwMQhG/TbSMDfi6PR9iRmObuDqt3fvT6FEsyWbGgZYmabM6tKvRKyUgQUJDz+1lNGYQLO+FVh9y7SMgg1syEoPUBXhCKCzIhjrDSaW17gAC12hRzKAVqDIT4wZiZ9cyd2vJSBYmozFcTn3OeQfAqm7kKCpPRLwbHVSK6yDC493bjhD+7kYZdQG8ILAAAAABJRU5ErkJggg==" 
+    width="500" 
+    height="500" 
+    preserveAspectRatio="xMidYMid meet"
+    class="pixel-art"
+    y="30"
+    x="124"
+  />
+
+  <text x="374" y="500" class="subtitle">LangJam GameJam 2025</text>
+  
+</svg>
