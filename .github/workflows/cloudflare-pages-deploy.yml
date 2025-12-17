@@ -24,7 +24,7 @@ jobs:
               uses: actions/cache@v4
               with:
                   path: ~/.pnpm-store
-                  key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: ${{ runner.os }}-pnpm-${{ hashFiles('web/pnpm-lock.yaml') }}
                   restore-keys: |
                       ${{ runner.os }}-pnpm-
 
@@ -50,20 +50,24 @@ jobs:
                   node-version: "21"
 
             - uses: pnpm/action-setup@v3
+              with:
+                  version: 10
+
+            # ─── Install wasm-pack ──────────────────────────────────────────────
+            - name: Install wasm-pack
+              run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
             # ─── Build WASM module ───────────────────────────────────────────────
             - name: Build WASM module
-              run: |
-                  wasm-pack build
+              run: wasm-pack build --target web
 
             # ─── Build web ──────────────────────────────────────────────────────
-            - name: Change to web directory
-              run: cd web
-
             - name: Install deps
+              working-directory: ./web
               run: pnpm install --no-frozen-lockfile
 
             - name: Build
+              working-directory: ./web
               run: pnpm build
 
             - name: Deploy to Cloudflare Pages
@@ -72,6 +76,6 @@ jobs:
                   apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
                   accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
                   command: >
-                      pages deploy ./dist
-                      --project-name sheetland
+                      pages deploy ./web/dist
+                      --project-name sheetlang
                       --branch main
