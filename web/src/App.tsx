@@ -1,5 +1,5 @@
 import "./App.css";
-import { Sheet } from "../../pkg";
+import init_wasm, { Sheet } from "../pkg/sheetlang";
 import { useEffect, useRef, useState } from "react";
 import { FitAddon, init, Terminal } from "ghostty-web";
 
@@ -13,10 +13,6 @@ function App() {
 	useEffect(() => {
 		let tmp_term: Terminal | null = null;
 		let resizeObserver: ResizeObserver | null = null;
-
-		const sheet = new Sheet();
-		sheetRef.current = sheet;
-
 		let currentLine = "";
 		const promptStr = "$ ";
 
@@ -160,7 +156,13 @@ function App() {
 			});
 		}
 
-		init().then(() => {
+		// Initialize WASM first, then terminal
+		init_wasm().then(() => {
+			const sheet = new Sheet();
+			sheetRef.current = sheet;
+
+			return init();
+		}).then(() => {
 			tmp_term = new Terminal({
 				fontSize: 14,
 				scrollback: 10000,
@@ -193,6 +195,34 @@ function App() {
 			setTerm(tmp_term);
 			fitAddon.fit();
 			tmp_term.focus();
+
+			// Parse and execute code from query parameters
+			const urlParams = new URLSearchParams(window.location.search);
+			const codeParam = urlParams.get("code");
+
+			if (codeParam && tmp_term && sheetRef.current) {
+				// Split by newlines to get individual commands
+				const lines = codeParam.split(/\r?\n/).map(line => line.trim()).filter(line => line);
+
+				if (lines.length > 0) {
+					tmp_term.writeln("Executing code from URL...");
+					tmp_term.writeln("");
+
+					for (const line of lines) {
+						// Display the command
+						tmp_term.write(promptStr + line + "\r\n");
+
+						// Add to history
+						historyRef.current.push(line);
+
+						// Execute the command
+						processCommand(line, tmp_term, sheetRef.current);
+					}
+
+					tmp_term.writeln("");
+					tmp_term.write(promptStr);
+				}
+			}
 		});
 
 		return () => {
@@ -224,6 +254,63 @@ function App() {
 		const trimmed = input.trim();
 
 		try {
+			// Handle 'help' command
+			if (trimmed === "help") {
+				terminal.writeln("SheetLang Commands:");
+				terminal.writeln("  A1 = <formula>       - Set a formula for a cell");
+				terminal.writeln("  A1:J10 = <formula>   - Set a formula for a range (slice)");
+				terminal.writeln("  tick                 - Advance the engine one step");
+				terminal.writeln("  show                 - Display all cell values");
+				terminal.writeln("  bshow A1:C3          - Display binary grid visualization");
+				terminal.writeln("  encode               - Generate shareable URL from history");
+				terminal.writeln("  help                 - Show this help message");
+				terminal.writeln("  exit                 - (not implemented in web)");
+				terminal.writeln("");
+				terminal.writeln("Examples:");
+				terminal.writeln("  A1 = 10");
+				terminal.writeln("  B1 = A1 + 5");
+				terminal.writeln("  A1:C3 = @[0,0] * 2");
+				terminal.writeln("  tick");
+				terminal.writeln("  show");
+				terminal.writeln("  bshow A1:C3");
+				terminal.writeln("  encode");
+				terminal.writeln("");
+				try {
+					const buildTime = (Sheet as any).build_timestamp?.() || "unknown";
+					terminal.writeln(`WASM build: ${buildTime}`);
+				} catch (e) {
+					terminal.writeln("WASM build: unknown (rebuild required)");
+				}
+				return;
+			}
+
+			// Handle 'encode' command
+			if (trimmed === "encode") {
+				const history = historyRef.current;
+				if (history.length === 0) {
+					terminal.writeln("No command history to encode");
+					return;
+				}
+
+				// Join history with newlines and encode
+				const code = history.join("\n");
+				const encoded = encodeURIComponent(code);
+				const url = `${window.location.origin}${window.location.pathname}?code=${encoded}`;
+
+				// Update URL bar without reload
+				window.history.pushState({}, "", url);
+
+				// Copy to clipboard
+				navigator.clipboard.writeText(url).then(() => {
+					terminal.writeln("URL updated and copied to clipboard!");
+					terminal.writeln(`Commands encoded: ${history.length}`);
+				}).catch(() => {
+					terminal.writeln("URL updated! (Clipboard copy failed - copy from address bar)");
+					terminal.writeln(`Commands encoded: ${history.length}`);
+				});
+				return;
+			}
+
 			// Handle 'tick' command
 			if (trimmed === "tick") {
 				sheet.tick();
@@ -236,7 +323,6 @@ function App() {
 				terminal.writeln("Current State:");
 				const values = sheet.get_all_values();
 				if (values.trim()) {
-					// Split by lines and write each one separately
 					const lines = values.split("\n").filter((line) => line.trim());
 					lines.forEach((line) => terminal.writeln(line));
 				} else {
@@ -245,24 +331,72 @@ function App() {
 				return;
 			}
 
-			// Handle 'help' command
-			if (trimmed === "help") {
-				terminal.writeln("SheetLang Commands:");
-				terminal.writeln("  A1 = <formula>  - Set a formula for a cell");
-				terminal.writeln("  tick            - Advance the engine one step");
-				terminal.writeln("  show            - Display all cell values");
-				terminal.writeln("  help            - Show this help message");
-				terminal.writeln("  exit            - (not implemented in web)");
-				terminal.writeln("");
-				terminal.writeln("Examples:");
-				terminal.writeln("  A1 = 10");
-				terminal.writeln("  B1 = A1 + 5");
-				terminal.writeln("  tick");
-				terminal.writeln("  show");
+			// Handle 'bshow' command (bshow A1:C3)
+			const bShowMatch = trimmed.match(/^bshow\s+([A-Z])(\d+):([A-Z])(\d+)$/i);
+			if (bShowMatch) {
+				const [, startCol, startRow, endCol, endRow, widthStr] = bShowMatch;
+				const startColNum = startCol.charCodeAt(0) - 65; // A=0
+				const endColNum = endCol.charCodeAt(0) - 65;
+				const startRowNum = parseInt(startRow);
+				const endRowNum = parseInt(endRow);
+				const cellWidth = 2;
+
+				// Read values from the grid
+				const grid: boolean[][] = [];
+				for (let row = startRowNum; row <= endRowNum; row++) {
+					const gridRow: boolean[] = [];
+					for (let col = startColNum; col <= endColNum; col++) {
+						const cell = String.fromCharCode(65 + col) + row;
+						const value = sheet.get_value(cell);
+						// Truthy: not "empty", not "0", not empty string
+						const isTruthy = value !== "empty" && value !== "0" && value.trim() !== "";
+						gridRow.push(isTruthy);
+					}
+					grid.push(gridRow);
+				}
+
+				// Display the grid
+				const fullBlock = "█";
+				const emptyBlock = " ";
+
+				// Top border
+				terminal.writeln("┌" + "─".repeat((endColNum - startColNum + 1) * cellWidth) + "┐");
+
+				// Grid rows
+				for (const row of grid) {
+					const rowStr = row.map(isTruthy =>
+						(isTruthy ? fullBlock : emptyBlock).repeat(cellWidth)
+					).join("");
+					terminal.writeln("│" + rowStr + "│");
+				}
+
+				// Bottom border
+				terminal.writeln("└" + "─".repeat((endColNum - startColNum + 1) * cellWidth) + "┘");
 				return;
 			}
 
-			// Try to parse as assignment (A1 = ...)
+			// Try to parse as slice/range assignment (A1:J10 = ...)
+			const sliceMatch = trimmed.match(/^([A-Z])(\d+):([A-Z])(\d+)\s*=\s*(.+)$/);
+			if (sliceMatch) {
+				const [, startCol, startRow, endCol, endRow, formula] = sliceMatch;
+				const startColNum = startCol.charCodeAt(0) - 65; // A=0
+				const endColNum = endCol.charCodeAt(0) - 65;
+				const startRowNum = parseInt(startRow);
+				const endRowNum = parseInt(endRow);
+
+				let count = 0;
+				for (let row = startRowNum; row <= endRowNum; row++) {
+					for (let col = startColNum; col <= endColNum; col++) {
+						const cell = String.fromCharCode(65 + col) + row;
+						sheet.set_formula(cell, formula);
+						count++;
+					}
+				}
+				terminal.writeln(`Formula set for ${count} cells`);
+				return;
+			}
+
+			// Try to parse as single cell assignment (A1 = ...)
 			const assignMatch = trimmed.match(/^([A-Z]\d+)\s*=\s*(.+)$/);
 			if (assignMatch) {
 				const [, cell, formula] = assignMatch;

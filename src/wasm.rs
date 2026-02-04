@@ -70,4 +70,8 @@ impl Sheet {
         }
         out
     }
+
+    pub fn build_timestamp() -> String {
+        format!("{} {}", env!("BUILD_DATE"), env!("BUILD_TIME"))
+    }
 }

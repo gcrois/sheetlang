@@ -13,7 +13,7 @@ export default defineConfig({
 		viteStaticCopy({
 			targets: [
 				{
-					src: "../pkg/*.wasm",
+					src: "./pkg/*.wasm",
 					dest: ".",
 				},
 			],
