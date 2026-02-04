@@ -73,9 +73,9 @@ jobs:
             - name: Deploy to Cloudflare Pages
               uses: cloudflare/wrangler-action@v3
               with:
-                  apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-                  accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-                  command: >
-                      pages deploy ./web/dist
-                      --project-name sheetlang
-                      --branch main
+                apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                command: >
+                    pages deploy ${{ vars.CLOUDFLARE_OUTPUT_DIR }}
+                    --project-name ${{ vars.CLOUDFLARE_PROJECT_NAME }}
+                    --branch main
