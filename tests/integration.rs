@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 use logos::Logos;
-use sheetlang::ast::Expr;
+use sheetlang::ast::{Expr, Value};
 use sheetlang::interpreter::Engine;
 use sheetlang::lexer::Token;
 use sheetlang::parser::parser;
@@ -45,19 +45,67 @@ fn test_snapshots() {
 
             match parser().parse(token_stream).into_result() {
                 Ok(expr) => {
-                    if let Expr::Assign(target, body) = expr {
-                        // Apply formula
-                        if let Err(e) = engine.set_formula(&target, *body) {
-                            output.push_str(&format!("Error setting {}: {}\n", target, e));
-                        }
+                    match expr {
+                        // Handle range assignments
+                        Expr::RangeAssign(range, body) => {
+                            let expanded_coords = range.expand();
 
-                        // 3. Capture Expectation if present
-                        // Syntax: // = <value>
-                        if let Some(comment) = comment_part {
-                            if let Some(expected_val) = comment.strip_prefix('=') {
-                                expectations.push((target, expected_val.trim().to_string()));
+                            // Determine assignment strategy based on value type
+                            match &*body {
+                                Expr::Array(items) => {
+                                    // Array expansion: A1:A5 = [1,2,3,4,5]
+                                    // Each cell gets corresponding array element
+                                    for (i, coord) in expanded_coords.iter().enumerate() {
+                                        if let Some(item_expr) = items.get(i) {
+                                            if let Err(e) = engine.set_formula(coord, item_expr.clone()) {
+                                                output.push_str(&format!("Error setting {}: {}\n", coord, e));
+                                            }
+                                        } else {
+                                            // Array too short, use Empty
+                                            if let Err(e) = engine.set_formula(coord, Expr::Literal(Value::Empty)) {
+                                                output.push_str(&format!("Error setting {}: {}\n", coord, e));
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    // Broadcast: A1:A5 = 10
+                                    // All cells get the same formula
+                                    for coord in expanded_coords.iter() {
+                                        if let Err(e) = engine.set_formula(coord, (*body).clone()) {
+                                            output.push_str(&format!("Error setting {}: {}\n", coord, e));
+                                        }
+                                    }
+
+                                    // Capture expectation for first cell (simplified)
+                                    if let Some(comment) = comment_part {
+                                        if let Some(expected_val) = comment.strip_prefix('=') {
+                                            if let Some(first_coord) = expanded_coords.first() {
+                                                expectations.push((first_coord.clone(), expected_val.trim().to_string()));
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
+
+                        // Keep existing single-cell assignment
+                        Expr::Assign(target, body) => {
+                            // Apply formula
+                            if let Err(e) = engine.set_formula(&target, *body) {
+                                output.push_str(&format!("Error setting {}: {}\n", target, e));
+                            }
+
+                            // 3. Capture Expectation if present
+                            // Syntax: // = <value>
+                            if let Some(comment) = comment_part {
+                                if let Some(expected_val) = comment.strip_prefix('=') {
+                                    expectations.push((target, expected_val.trim().to_string()));
+                                }
+                            }
+                        }
+
+                        _ => {}
                     }
                 }
                 Err(errs) => {

@@ -174,4 +174,120 @@ mod tests {
         assert_int(&engine, "A1", 1);
         assert_int(&engine, "A2", 5);
     }
+
+    #[test]
+    fn test_cell_coord_parsing() {
+        use crate::ast::CellCoord;
+
+        assert_eq!(
+            CellCoord::from_str("A1"),
+            Some(CellCoord {
+                col: "A".to_string(),
+                row: 1
+            })
+        );
+        assert_eq!(
+            CellCoord::from_str("Z99"),
+            Some(CellCoord {
+                col: "Z".to_string(),
+                row: 99
+            })
+        );
+        assert_eq!(CellCoord::from_str("A0"), None); // Row must be >= 1
+        assert_eq!(CellCoord::from_str("a1"), None); // Must be uppercase
+        assert_eq!(CellCoord::from_str("AA1"), None); // Only single letter
+        assert_eq!(CellCoord::from_str("A"), None); // Must have row number
+    }
+
+    #[test]
+    fn test_cell_range_expansion_1d_vertical() {
+        use crate::ast::CellRange;
+
+        let range = CellRange::from_str("A1:A5").unwrap();
+        assert_eq!(range.expand(), vec!["A1", "A2", "A3", "A4", "A5"]);
+    }
+
+    #[test]
+    fn test_cell_range_expansion_1d_horizontal() {
+        use crate::ast::CellRange;
+
+        let range = CellRange::from_str("A1:E1").unwrap();
+        assert_eq!(range.expand(), vec!["A1", "B1", "C1", "D1", "E1"]);
+    }
+
+    #[test]
+    fn test_cell_range_expansion_2d() {
+        use crate::ast::CellRange;
+
+        let range = CellRange::from_str("A1:C2").unwrap();
+        assert_eq!(
+            range.expand(),
+            vec!["A1", "B1", "C1", "A2", "B2", "C2"]
+        );
+    }
+
+    #[test]
+    fn test_cell_range_expansion_with_step() {
+        use crate::ast::CellRange;
+
+        let range = CellRange::from_str("A1:A10:2").unwrap();
+        assert_eq!(range.expand(), vec!["A1", "A3", "A5", "A7", "A9"]);
+    }
+
+    #[test]
+    fn test_cell_range_backwards() {
+        use crate::ast::CellRange;
+
+        // Should auto-swap to forward range
+        let range = CellRange::from_str("A5:A1").unwrap();
+        assert_eq!(range.expand(), vec!["A1", "A2", "A3", "A4", "A5"]);
+    }
+
+    #[test]
+    fn test_slice_assignment_broadcast() {
+        use crate::ast::CellRange;
+
+        let mut engine = Engine::new();
+
+        // Manually simulate what integration.rs would do
+        let range = CellRange::from_str("A1:A3").unwrap();
+        let value_expr = Expr::Literal(Value::Int(10));
+
+        for coord in range.expand() {
+            engine.set_formula(&coord, value_expr.clone()).unwrap();
+        }
+
+        engine.tick();
+
+        assert_int(&engine, "A1", 10);
+        assert_int(&engine, "A2", 10);
+        assert_int(&engine, "A3", 10);
+    }
+
+    #[test]
+    fn test_slice_assignment_array_expansion() {
+        use crate::ast::CellRange;
+
+        let mut engine = Engine::new();
+
+        let range = CellRange::from_str("B1:B3").unwrap();
+        let coords = range.expand();
+        let array_items = vec![
+            Expr::Literal(Value::Int(1)),
+            Expr::Literal(Value::Int(2)),
+            Expr::Literal(Value::Int(3)),
+        ];
+
+        for (i, coord) in coords.iter().enumerate() {
+            if let Some(item) = array_items.get(i) {
+                engine.set_formula(coord, item.clone()).unwrap();
+            }
+        }
+
+        engine.tick();
+
+        assert_int(&engine, "B1", 1);
+        assert_int(&engine, "B2", 2);
+        assert_int(&engine, "B3", 3);
+    }
 }

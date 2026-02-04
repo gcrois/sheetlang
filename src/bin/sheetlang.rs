@@ -1,5 +1,5 @@
 use ariadne::{Color, Label, Report, ReportKind, Source}; // Cleaned up unused imports
-use ast::Expr;
+use ast::{Expr, Value};
 use chumsky::input::Stream;
 use chumsky::prelude::*;
 use interpreter::Engine;
@@ -50,6 +50,44 @@ fn main() {
 
                 match parse_result.into_result() {
                     Ok(expr) => match expr {
+                        Expr::RangeAssign(range, body) => {
+                            let expanded_coords = range.expand();
+                            let mut count = 0;
+
+                            match &*body {
+                                Expr::Array(items) => {
+                                    // Array expansion
+                                    for (i, coord) in expanded_coords.iter().enumerate() {
+                                        if let Some(item_expr) = items.get(i) {
+                                            if let Err(e) = engine.set_formula(coord, item_expr.clone()) {
+                                                println!("Error setting {}: {}", coord, e);
+                                            } else {
+                                                count += 1;
+                                            }
+                                        } else {
+                                            // Array too short, use Empty
+                                            if let Err(e) = engine.set_formula(coord, Expr::Literal(Value::Empty)) {
+                                                println!("Error setting {}: {}", coord, e);
+                                            } else {
+                                                count += 1;
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    // Broadcast
+                                    for coord in expanded_coords.iter() {
+                                        if let Err(e) = engine.set_formula(coord, (*body).clone()) {
+                                            println!("Error setting {}: {}", coord, e);
+                                        } else {
+                                            count += 1;
+                                        }
+                                    }
+                                }
+                            }
+
+                            println!("Formula set for {} cells", count);
+                        }
                         Expr::Assign(target, body) => {
                             if let Err(e) = engine.set_formula(&target, *body) {
                                 println!("Error: {}", e);

@@ -224,6 +224,7 @@ impl Engine {
             }
 
             Expr::Assign(_, _) => Value::Empty,
+            Expr::RangeAssign(_, _) => Value::Empty,  // Should be expanded at integration layer
         }
     }
 

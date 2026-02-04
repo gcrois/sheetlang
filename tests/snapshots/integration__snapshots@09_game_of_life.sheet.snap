@@ -1,0 +1,249 @@
+---
+source: tests/integration.rs
+expression: output
+input_file: tests/scripts/09_game_of_life.sheet
+---
+--- CODE ---
+// Conway's Game of Life
+// Rules:
+// - Any live cell (1) with 2-3 neighbors survives
+// - Any dead cell (0) with exactly 3 neighbors becomes alive
+// - All other cells die/stay dead
+
+// Cell Z1 stores the Game of Life logic as a lambda function
+// Takes: neighbor_count (n) and current_state (c)
+// Returns: 1 (alive) or 0 (dead) as integer
+// Uses || operator to return 1 if alive condition is true, otherwise 0
+Z1 = (n, c) => (((c == 1) && (n == 2 || n == 3)) && 1) || ((n == 3) && 1) || 0
+
+// Use slice assignment to assign Game of Life formula to entire 10x10 grid
+// Each cell counts its 8 neighbors using relative references, then calls Z1 lambda
+A1:J10 = Z1((@[-1,-1]||0) + (@[0,-1]||0) + (@[1,-1]||0) + (@[-1,0]||0) + (@[1,0]||0) + (@[-1,1]||0) + (@[0,1]||0) + (@[1,1]||0), @[0,0]||0)
+
+// NOW initialize the grid with a glider pattern (AFTER slice assignment)
+// Glider is a simple pattern that moves diagonally
+B2 = 1
+C3 = 1
+A4 = 1
+B4 = 1
+C4 = 1
+
+// Glider Pattern Evolution:
+// Tick 1: B2=1, C3=1, A4=1, B4=1, C4=1 (initial glider)
+// Tick 2: A3=1, B2=1, C3=1, A4=1, B4=1, C4=1, B5=1 (glider evolves)
+// The pattern continues to evolve and move diagonally across the grid!
+//
+// This demonstrates:
+// 1. Slice assignments (A1:J10 = formula) working with complex formulas
+// 2. Lambda functions storing reusable logic
+// 3. Relative references (@[dx,dy]) for neighbor counting
+// 4. Reactive evaluation - each tick computes based on previous state
+
+
+--- PARSE & EXECUTION ---
+
+[Tick 1]
+A1: empty
+B1: empty
+C1: empty
+D1: empty
+E1: empty
+F1: empty
+G1: empty
+H1: empty
+I1: empty
+J1: empty
+Z1: <fn>
+A2: empty
+B2: 1
+C2: empty
+D2: empty
+E2: empty
+F2: empty
+G2: empty
+H2: empty
+I2: empty
+J2: empty
+A3: empty
+B3: empty
+C3: 1
+D3: empty
+E3: empty
+F3: empty
+G3: empty
+H3: empty
+I3: empty
+J3: empty
+A4: 1
+B4: 1
+C4: 1
+D4: empty
+E4: empty
+F4: empty
+G4: empty
+H4: empty
+I4: empty
+J4: empty
+A5: empty
+B5: empty
+C5: empty
+D5: empty
+E5: empty
+F5: empty
+G5: empty
+H5: empty
+I5: empty
+J5: empty
+A6: empty
+B6: empty
+C6: empty
+D6: empty
+E6: empty
+F6: empty
+G6: empty
+H6: empty
+I6: empty
+J6: empty
+A7: empty
+B7: empty
+C7: empty
+D7: empty
+E7: empty
+F7: empty
+G7: empty
+H7: empty
+I7: empty
+J7: empty
+A8: empty
+B8: empty
+C8: empty
+D8: empty
+E8: empty
+F8: empty
+G8: empty
+H8: empty
+I8: empty
+J8: empty
+A9: empty
+B9: empty
+C9: empty
+D9: empty
+E9: empty
+F9: empty
+G9: empty
+H9: empty
+I9: empty
+J9: empty
+A10: empty
+B10: empty
+C10: empty
+D10: empty
+E10: empty
+F10: empty
+G10: empty
+H10: empty
+I10: empty
+J10: empty
+
+[Tick 2]
+A1: 0
+B1: 0
+C1: 0
+D1: 0
+E1: 0
+F1: 0
+G1: 0
+H1: 0
+I1: 0
+J1: 0
+Z1: <fn>
+A2: 0
+B2: 1
+C2: 0
+D2: 0
+E2: 0
+F2: 0
+G2: 0
+H2: 0
+I2: 0
+J2: 0
+A3: 1
+B3: 0
+C3: 1
+D3: 0
+E3: 0
+F3: 0
+G3: 0
+H3: 0
+I3: 0
+J3: 0
+A4: 1
+B4: 1
+C4: 1
+D4: 0
+E4: 0
+F4: 0
+G4: 0
+H4: 0
+I4: 0
+J4: 0
+A5: 0
+B5: 1
+C5: 0
+D5: 0
+E5: 0
+F5: 0
+G5: 0
+H5: 0
+I5: 0
+J5: 0
+A6: 0
+B6: 0
+C6: 0
+D6: 0
+E6: 0
+F6: 0
+G6: 0
+H6: 0
+I6: 0
+J6: 0
+A7: 0
+B7: 0
+C7: 0
+D7: 0
+E7: 0
+F7: 0
+G7: 0
+H7: 0
+I7: 0
+J7: 0
+A8: 0
+B8: 0
+C8: 0
+D8: 0
+E8: 0
+F8: 0
+G8: 0
+H8: 0
+I8: 0
+J8: 0
+A9: 0
+B9: 0
+C9: 0
+D9: 0
+E9: 0
+F9: 0
+G9: 0
+H9: 0
+I9: 0
+J9: 0
+A10: 0
+B10: 0
+C10: 0
+D10: 0
+E10: 0
+F10: 0
+G10: 0
+H10: 0
+I10: 0
+J10: 0

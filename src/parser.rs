@@ -1,6 +1,20 @@
-use crate::ast::{Expr, Op, Value};
+use crate::ast::{CellCoord, CellRange, Expr, Op, Value};
 use crate::lexer::Token;
 use chumsky::prelude::*;
+
+fn is_cell_reference(s: &str) -> bool {
+    let mut chars = s.chars();
+
+    // Must start with uppercase letter
+    let _first = match chars.next() {
+        Some(c) if c.is_ascii_uppercase() => c,
+        _ => return false,
+    };
+
+    // Rest must be digits
+    let rest: String = chars.collect();
+    !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
+}
 
 #[derive(Clone)]
 enum PostfixOp {
@@ -31,6 +45,31 @@ where
                 } else {
                     n as i32
                 }
+            });
+
+        // Parse cell coordinate (A1, B2, etc.)
+        let cell_coord = select! { Token::Ident(s) => s }
+            .try_map(|s, span| {
+                if is_cell_reference(&s) {
+                    CellCoord::from_str(&s)
+                        .ok_or_else(|| Rich::custom(span, "Invalid cell reference"))
+                } else {
+                    Err(Rich::custom(span, "Not a cell reference"))
+                }
+            });
+
+        // Parse cell range (A1:A5 or A1:C3 or A1:A10:2)
+        let cell_range = cell_coord
+            .clone()
+            .then_ignore(just(Token::Colon))
+            .then(cell_coord)
+            .then(
+                just(Token::Colon)
+                    .ignore_then(select! { Token::Int(n) => n as i32 })
+                    .or_not()
+            )
+            .map(|((start, end), step)| {
+                CellRange { start, end, step }
             });
 
         // Relative Ref
@@ -157,10 +196,18 @@ where
             |lhs, (op, rhs)| Expr::Binary(Box::new(lhs), op, Box::new(rhs)),
         );
 
-        let assign = select! { Token::Ident(s) => s }
-            .then_ignore(just(Token::Eq))
-            .then(logical.clone())
-            .map(|(id, val)| Expr::Assign(id, Box::new(val)));
+        let assign = choice((
+            // Try range assignment first: "A1:A5 = 10"
+            cell_range
+                .then_ignore(just(Token::Eq))
+                .then(logical.clone())
+                .map(|(range, val)| Expr::RangeAssign(range, Box::new(val))),
+            // Fallback to regular assignment: "A1 = 10"
+            select! { Token::Ident(s) => s }
+                .then_ignore(just(Token::Eq))
+                .then(logical.clone())
+                .map(|(id, val)| Expr::Assign(id, Box::new(val))),
+        ));
 
         assign.or(logical).boxed()
     })
