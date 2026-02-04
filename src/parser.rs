@@ -21,10 +21,22 @@ where
             Token::Ident(s) => Expr::Ref(s),
         };
 
+        // Parse a signed integer: optional minus followed by an integer
+        let signed_int = just(Token::Minus)
+            .or_not()
+            .then(select! { Token::Int(n) => n })
+            .map(|(minus, n)| {
+                if minus.is_some() {
+                    -(n as i32)
+                } else {
+                    n as i32
+                }
+            });
+
         // Relative Ref
         let rel_ref = just(Token::At)
             .ignore_then(
-                select! { Token::Int(n) => n as i32 }
+                signed_int
                     .separated_by(just(Token::Comma))
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::LBracket), just(Token::RBracket)),

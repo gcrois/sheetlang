@@ -19,5 +19,5 @@ A3 = @[0, -1]            // = 30
 B3 = @[-1, -1]           // = 30
 
 // Out of bounds (negative coordinates)
-// A1 looks up (@[0, -1]) -> Error/Empty
-A_Error = @[0, -1]       // = empty
+// C1 looks up (@[0, -1]) -> Error/Empty (row above doesn't exist)
+C1 = @[0, -1]            // = empty

@@ -1,6 +1,5 @@
 use std::fmt;
 
-// Added PartialEq here
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Literal(Value),

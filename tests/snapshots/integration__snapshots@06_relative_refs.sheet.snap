@@ -25,23 +25,33 @@ A3 = @[0, -1]            // = 30
 B3 = @[-1, -1]           // = 30
 
 // Out of bounds (negative coordinates)
-// A1 looks up (@[0, -1]) -> Error/Empty
-A_Error = @[0, -1]       // = empty
+// C1 looks up (@[0, -1]) -> Error/Empty (row above doesn't exist)
+C1 = @[0, -1]            // = empty
 
 --- PARSE & EXECUTION ---
-Parse Error on 'E1 = @[-4, 0]': found 'Minus' at 4..5 expected something else, or 'RBracket'
-Parse Error on 'A3 = @[0, -1]': found 'Minus' at 6..7 expected something else
-Parse Error on 'B3 = @[-1, -1]': found 'Minus' at 4..5 expected something else, or 'RBracket'
-Parse Error on 'A_Error = @[0, -1]': found 'Minus' at 6..7 expected something else
 
 [Tick 1]
 A1: 10
 B1: 20
+C1: empty
+E1: empty
 A2: 30
 B2: 40
+A3: empty
+B3: empty
 
 [Tick 2]
 A1: 10
 B1: 20
+C1: empty
+E1: 10
 A2: 30
 B2: 40
+A3: 30
+B3: 30
+
+--- CHECKS ---
+✅ E1: Matches (10)
+✅ A3: Matches (30)
+✅ B3: Matches (30)
+✅ C1: Matches (empty)
