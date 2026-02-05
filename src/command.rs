@@ -105,17 +105,7 @@ impl Command {
     }
 
     pub fn print_help() {
-        println!("SheetLang Commands:");
-        println!();
-        for cmd in Self::all_command_types() {
-            println!("  {}", cmd.syntax());
-            println!("    {}", cmd.description());
-            let examples = cmd.examples();
-            if !examples.is_empty() {
-                println!("    Examples: {}", examples.join(", "));
-            }
-            println!();
-        }
+        println!("{}", Self::format_help());
     }
 }
 
@@ -375,9 +365,10 @@ impl Command {
         }
     }
 
-    fn format_help() -> String {
+    pub fn format_help() -> String {
         let mut out = String::new();
-        out.push_str("SheetLang Commands:\n\n");
+        out.push_str("SheetLang Commands:\n");
+        out.push_str(&format!("{}\n\n", build_info_line()));
 
         for cmd in Self::all_command_types() {
             out.push_str(&format!("  {}\n", cmd.syntax()));
@@ -391,6 +382,25 @@ impl Command {
 
         out
     }
+}
+
+pub fn build_info_line() -> String {
+    let date = env!("BUILD_DATE");
+    let time = env!("BUILD_TIME");
+    let branch = env!("BUILD_GIT_BRANCH");
+    let commit = env!("BUILD_GIT_HASH");
+
+    let branch_display = if branch.is_empty() { "dev" } else { branch };
+    let commit_display = if commit.is_empty() { "dev" } else { commit };
+    let time_display = if time.is_empty() { "unknown" } else { time };
+
+    format!(
+        "Build: {} {} · branch {} · commit {}",
+        date,
+        time_display,
+        branch_display,
+        commit_display
+    )
 }
 
 // Include generated demo scripts code

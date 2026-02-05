@@ -128,21 +128,12 @@ impl Sheet {
         format!("{} {}", env!("BUILD_DATE"), env!("BUILD_TIME"))
     }
 
+    pub fn build_info(&self) -> String {
+        crate::command::build_info_line()
+    }
+
     pub fn get_help() -> String {
-        let mut out = String::new();
-        out.push_str("SheetLang Commands:\n\n");
-
-        for cmd in crate::command::Command::all_command_types() {
-            out.push_str(&format!("  {}\n", cmd.syntax()));
-            out.push_str(&format!("    {}\n", cmd.description()));
-            let examples = cmd.examples();
-            if !examples.is_empty() {
-                out.push_str(&format!("    Examples: {}\n", examples.join(", ")));
-            }
-            out.push_str("\n");
-        }
-
-        out
+        crate::command::Command::format_help()
     }
 
     /// Execute a command string - parses and executes, returning the result as a JS object

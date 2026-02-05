@@ -23,8 +23,40 @@ fn main() {
         println!("cargo:rustc-env=BUILD_TIME=unknown");
     }
 
+    let git_branch = git_output(&["rev-parse", "--abbrev-ref", "HEAD"])
+        .filter(|s| s != "HEAD")
+        .unwrap_or_else(|| "dev".to_string());
+    let git_hash = git_output(&["rev-parse", "--short", "HEAD"])
+        .unwrap_or_else(|| "dev".to_string());
+
+    println!("cargo:rustc-env=BUILD_GIT_BRANCH={}", git_branch);
+    println!("cargo:rustc-env=BUILD_GIT_HASH={}", git_hash);
+
+    // Rebuild when git state changes (best-effort).
+    if let Ok(head) = fs::read_to_string(".git/HEAD") {
+        println!("cargo:rerun-if-changed=.git/HEAD");
+        if let Some(ref_path) = head.strip_prefix("ref: ").map(|s| s.trim()) {
+            println!("cargo:rerun-if-changed=.git/{}", ref_path);
+        }
+    }
+    println!("cargo:rerun-if-changed=.git/packed-refs");
+
     // Generate demo scripts code
     generate_demo_scripts();
+}
+
+fn git_output(args: &[&str]) -> Option<String> {
+    let output = Command::new("git").args(args).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
 }
 
 fn generate_demo_scripts() {

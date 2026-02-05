@@ -233,6 +233,10 @@ function App() {
 			tmp_term.open(terminalRef.current!);
 
 			tmp_term.writeln("SheetLang Terminal");
+			const buildInfo = (sheetRef.current as { build_info?: () => string } | null)?.build_info?.();
+			if (buildInfo) {
+				tmp_term.writeln(buildInfo);
+			}
 			tmp_term.writeln("A reactive spreadsheet programming language");
 			tmp_term.writeln("");
 			tmp_term.writeln("Type 'help' for available commands");
