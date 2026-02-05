@@ -19,3 +19,6 @@ D2 = 0 || 5              // = 5
 // E1 is empty on Tick 1 (treated as falsy), so it becomes 100.
 // On Tick 2, E1 is 100 (truthy), so it stays 100.
 E1 = E1 || 100           // = 100
+
+tick
+tick

@@ -1,6 +1,7 @@
 use chumsky::prelude::*;
 use logos::Logos;
 use sheetlang::ast::{Expr, Value};
+use sheetlang::command::{command_parser, CommandResult};
 use sheetlang::interpreter::Engine;
 use sheetlang::lexer::Token;
 use sheetlang::parser::parser;
@@ -15,9 +16,10 @@ fn test_snapshots() {
 
         let mut engine = Engine::new();
         let mut output = String::new();
-        
+
         // Store (CellName, ExpectedString)
         let mut expectations: Vec<(String, String)> = Vec::new();
+        let mut tick_count = 0;
 
         output.push_str("--- CODE ---\n");
         output.push_str(&input);
@@ -37,12 +39,44 @@ fn test_snapshots() {
                 continue;
             }
 
-            // 2. Parse Code
+            // 2. Parse Code - try command parser first
             let token_iter = Token::lexer(code_part)
                 .spanned()
                 .map(|(tok, _span)| tok.unwrap_or(Token::Dot));
             let token_stream = chumsky::input::Stream::from_iter(token_iter);
 
+            // Try parsing as command first
+            let token_iter_cmd = Token::lexer(code_part)
+                .spanned()
+                .map(|(tok, _span)| tok.unwrap_or(Token::Dot));
+            let token_stream_cmd = chumsky::input::Stream::from_iter(token_iter_cmd);
+
+            if let Ok(cmd) = command_parser().parse(token_stream_cmd).into_result() {
+                // Execute command using the same logic as CLI
+                match cmd.execute(&mut engine) {
+                    CommandResult::Output(text) => {
+                        // For tick commands, increment counter and dump state
+                        if text.contains("Tick processed") {
+                            tick_count += 1;
+                            output.push_str(&format!("\n[Tick {}]\n", tick_count));
+                            output.push_str(&dump_state(&engine));
+                        }
+                        // Ignore other command outputs for now
+                    }
+                    CommandResult::BShow(_) => {
+                        // Ignore bshow in tests
+                    }
+                    CommandResult::Demo(_) => {
+                        // Demos shouldn't be in test scripts
+                    }
+                    CommandResult::Exit => {
+                        // Ignore exit in tests
+                    }
+                }
+                continue;
+            }
+
+            // Fall back to expression parser
             match parser().parse(token_stream).into_result() {
                 Ok(expr) => {
                     match expr {
@@ -116,16 +150,7 @@ fn test_snapshots() {
             }
         }
 
-        // 3. Run Ticks
-        output.push_str("\n[Tick 1]\n");
-        engine.tick();
-        output.push_str(&dump_state(&engine));
-
-        output.push_str("\n[Tick 2]\n");
-        engine.tick();
-        output.push_str(&dump_state(&engine));
-
-        // 4. Verify Expectations (against final state)
+        // 3. Verify Expectations (against final state)
         if !expectations.is_empty() {
             output.push_str("\n--- CHECKS ---\n");
             for (cell, expected) in expectations {

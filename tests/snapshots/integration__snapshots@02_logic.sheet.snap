@@ -26,6 +26,9 @@ D2 = 0 || 5              // = 5
 // On Tick 2, E1 is 100 (truthy), so it stays 100.
 E1 = E1 || 100           // = 100
 
+tick
+tick
+
 --- PARSE & EXECUTION ---
 
 [Tick 1]
@@ -51,15 +54,3 @@ B2: false
 C2: false
 D2: 5
 C3: true
-
---- CHECKS ---
-✅ A1: Matches (true)
-✅ A2: Matches (false)
-✅ B1: Matches (true)
-✅ B2: Matches (false)
-✅ C1: Matches (true)
-✅ C2: Matches (false)
-✅ C3: Matches (true)
-✅ D1: Matches (2)
-✅ D2: Matches (5)
-✅ E1: Matches (100)

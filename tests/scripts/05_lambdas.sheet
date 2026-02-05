@@ -16,3 +16,6 @@ B3 = A3(5)               // = 10
 C1 = (v) => v + 1
 // C2 applies it
 C2 = C1(99)              // = 100
+
+tick
+tick

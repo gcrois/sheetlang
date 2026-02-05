@@ -17,3 +17,5 @@ A6 = 20 / 3              // = 6
 
 // Zero handling
 A7 = 5 * 0               // = 0
+
+tick

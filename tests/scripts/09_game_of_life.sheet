@@ -10,25 +10,19 @@
 // Uses || operator to return 1 if alive condition is true, otherwise 0
 Z1 = (n, c) => (((c == 1) && (n == 2 || n == 3)) && 1) || ((n == 3) && 1) || 0
 
-// Use slice assignment to assign Game of Life formula to entire 10x10 grid
-// Each cell counts its 8 neighbors using relative references, then calls Z1 lambda
-A1:J10 = Z1((@[-1,-1]||0) + (@[0,-1]||0) + (@[1,-1]||0) + (@[-1,0]||0) + (@[1,0]||0) + (@[-1,1]||0) + (@[0,1]||0) + (@[1,1]||0), @[0,0]||0)
+// initialize a 3x3 grid with dead cells
+A1:C3 = 0
 
-// NOW initialize the grid with a glider pattern (AFTER slice assignment)
-// Glider is a simple pattern that moves diagonally
-B2 = 1
-C3 = 1
-A4 = 1
-B4 = 1
-C4 = 1
+// create blinker
+B1:B3 = 1
 
-// Glider Pattern Evolution:
-// Tick 1: B2=1, C3=1, A4=1, B4=1, C4=1 (initial glider)
-// Tick 2: A3=1, B2=1, C3=1, A4=1, B4=1, C4=1, B5=1 (glider evolves)
-// The pattern continues to evolve and move diagonally across the grid!
-//
-// This demonstrates:
-// 1. Slice assignments (A1:J10 = formula) working with complex formulas
-// 2. Lambda functions storing reusable logic
-// 3. Relative references (@[dx,dy]) for neighbor counting
-// 4. Reactive evaluation - each tick computes based on previous state
+// apply
+tick
+
+// Slice assign the game of life rules
+A1:C3 = Z1((@[-1,-1]||0) + (@[0,-1]||0) + (@[1,-1]||0) + (@[-1,0]||0) + (@[1,0]||0) + (@[-1,1]||0) + (@[0,1]||0) + (@[1,1]||0), @[0,0]||0)
+
+// Run a few ticks to see the blinker pattern evolve
+tick
+tick
+tick

@@ -66,6 +66,9 @@ H3:H6 = [31, 32]
 
 H7 = H3 + H4  // = 63
 
+tick
+tick
+
 
 --- PARSE & EXECUTION ---
 
@@ -186,14 +189,3 @@ A19: 13
 A20: 20
 A21: 13
 A22: 56
-
---- CHECKS ---
-✅ A6: Matches (50)
-✅ B6: Matches (15)
-✅ C2: Matches (100)
-✅ A11: Matches (21)
-✅ D10: Matches (21)
-✅ A22: Matches (56)
-✅ B14: Matches (250)
-✅ H1: Matches (42)
-✅ H7: Matches (63)

@@ -8,6 +8,7 @@ pub enum Command {
     Tick(Option<CellRange>),
     Show(Option<CellRange>),
     BShow(Option<CellRange>),
+    Demo(u8),
     Help,
     Encode,
     Exit,
@@ -20,6 +21,7 @@ impl Command {
             Command::Tick(_) => "tick",
             Command::Show(_) => "show",
             Command::BShow(_) => "bshow",
+            Command::Demo(_) => "demo",
             Command::Help => "help",
             Command::Encode => "encode",
             Command::Exit => "exit",
@@ -37,6 +39,7 @@ impl Command {
                     format!("{} [range]", base)
                 }
             }
+            Command::Demo(_) => "demo <number>".to_string(),
             Command::Help => "help".to_string(),
             Command::Encode => "encode".to_string(),
             Command::Exit => "exit".to_string(),
@@ -54,6 +57,7 @@ impl Command {
             Command::Show(Some(_)) => "Display cell values in range",
             Command::BShow(None) => "Display binary grid visualization (all cells)",
             Command::BShow(Some(_)) => "Display binary grid visualization (range)",
+            Command::Demo(_) => "Load and run a demo script",
             Command::Help => "Show this help message",
             Command::Encode => "Generate shareable URL from command history",
             Command::Exit => "Exit the CLI",
@@ -68,6 +72,7 @@ impl Command {
             Command::Tick(_) => vec!["tick", "tick A1:C3"],
             Command::Show(_) => vec!["show", "show A1:C3"],
             Command::BShow(_) => vec!["bshow", "bshow A1:C3"],
+            Command::Demo(_) => vec!["demo 1", "demo 9"],
             Command::Help => vec!["help"],
             Command::Encode => vec!["encode"],
             Command::Exit => vec!["exit"],
@@ -83,6 +88,7 @@ impl Command {
             Command::Tick(None),
             Command::Show(None),
             Command::BShow(None),
+            Command::Demo(1),
             Command::Eval(Expr::Assign("A1".to_string(), Box::new(Expr::Literal(crate::ast::Value::Int(0))))),
             Command::Eval(Expr::RangeAssign(
                 crate::ast::CellRange {
@@ -183,6 +189,13 @@ where
         .filter(|s| s == "encode")
         .to(Command::Encode);
 
+    // demo <n>
+    let demo_cmd = ident
+        .clone()
+        .filter(|s| s == "demo")
+        .ignore_then(select! { Token::Int(n) => n as u8 })
+        .map(Command::Demo);
+
     // exit
     let exit_cmd = ident
         .clone()
@@ -194,6 +207,7 @@ where
         tick_cmd,
         show_cmd,
         bshow_cmd,
+        demo_cmd,
         help_cmd,
         encode_cmd,
         exit_cmd,
@@ -207,6 +221,8 @@ pub enum CommandResult {
     Output(String),
     /// Binary show visualization data (coordinates)
     BShow(Vec<Coord>),
+    /// Demo script to execute (script content)
+    Demo(String),
     /// Exit the CLI
     Exit,
 }
@@ -293,6 +309,19 @@ impl Command {
                 CommandResult::BShow(coords)
             }
 
+            Command::Demo(n) => {
+                match get_demo_script(n) {
+                    Some(script) => CommandResult::Demo(script.to_string()),
+                    None => {
+                        CommandResult::Output(format!(
+                            "Error: Demo {} not found. Available demos: 1-{}",
+                            n,
+                            get_demo_count()
+                        ))
+                    }
+                }
+            }
+
             Command::Encode => {
                 CommandResult::Output("Encode command handled by web CLI".to_string())
             }
@@ -363,3 +392,6 @@ impl Command {
         out
     }
 }
+
+// Include generated demo scripts code
+include!(concat!(env!("OUT_DIR"), "/demo_scripts.rs"));

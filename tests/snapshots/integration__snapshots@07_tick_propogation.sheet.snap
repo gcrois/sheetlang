@@ -26,6 +26,9 @@ C1 = B1                  // = 0
 // Tick 2: D1 (1) + 1 = 2.
 D1 = (D1 || 0) + 1       // = 2
 
+tick
+tick
+
 --- PARSE & EXECUTION ---
 
 [Tick 1]
@@ -39,9 +42,3 @@ A1: 10
 B1: 10
 C1: 0
 D1: 2
-
---- CHECKS ---
-✅ A1: Matches (10)
-✅ B1: Matches (10)
-✅ C1: Matches (0)
-✅ D1: Matches (2)

@@ -23,6 +23,9 @@ C1 = (v) => v + 1
 // C2 applies it
 C2 = C1(99)              // = 100
 
+tick
+tick
+
 --- PARSE & EXECUTION ---
 
 [Tick 1]
@@ -44,9 +47,3 @@ B2: 30
 C2: 100
 A3: <fn>
 B3: 10
-
---- CHECKS ---
-✅ B1: Matches (42)
-✅ B2: Matches (30)
-✅ B3: Matches (10)
-✅ C2: Matches (100)

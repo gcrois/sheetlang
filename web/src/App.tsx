@@ -145,6 +145,62 @@ function App() {
 			}
 		};
 
+		const handleDragOver = (e: DragEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+		};
+
+		const handleDrop = (e: DragEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+
+			const files = e.dataTransfer?.files;
+			if (files && files.length > 0 && tmp_term) {
+				const file = files[0];
+
+				// Check if it's a .sheet file
+				if (!file.name.endsWith('.sheet')) {
+					tmp_term.writeln(`\r\nError: Only .sheet files are supported (got: ${file.name})`);
+					tmp_term.write(promptStr);
+					return;
+				}
+
+				const reader = new FileReader();
+				reader.onload = (event) => {
+					const text = event.target?.result as string;
+					if (text && tmp_term) {
+						tmp_term.writeln(`\r\nLoading ${file.name}...\r\n`);
+
+						// Split by newlines and process each line
+						const lines = text.split(/\r?\n/);
+						let executedCount = 0;
+
+						for (let i = 0; i < lines.length; i++) {
+							const line = lines[i].trim();
+							// Skip empty lines
+							if (line) {
+								// Write the line to the terminal
+								tmp_term.write(promptStr + line + "\r\n");
+
+								// Add to history
+								historyRef.current.push(line);
+								historyIndexRef.current = -1;
+
+								// Execute the command
+								processCommand(line, tmp_term, sheetRef.current);
+								executedCount++;
+							}
+						}
+
+						tmp_term.writeln(`\r\nExecuted ${executedCount} command(s) from ${file.name}\r\n`);
+						currentLine = "";
+						tmp_term.write(promptStr);
+					}
+				};
+				reader.readAsText(file);
+			}
+		};
+
 		const refElement = terminalRef.current;
 		if (refElement) {
 			refElement.addEventListener("keydown", handleKeydownCapture, {
@@ -154,6 +210,9 @@ function App() {
 			refElement.addEventListener("paste", handlePaste, {
 				capture: true,
 			});
+
+			refElement.addEventListener("dragover", handleDragOver);
+			refElement.addEventListener("drop", handleDrop);
 		}
 
 		// Initialize WASM first, then terminal
@@ -235,6 +294,8 @@ function App() {
 				refElement.removeEventListener("paste", handlePaste, {
 					capture: true,
 				});
+				refElement.removeEventListener("dragover", handleDragOver);
+				refElement.removeEventListener("drop", handleDrop);
 			}
 			tmp_term?.dispose();
 		};
@@ -297,6 +358,24 @@ function App() {
 			} else if (result.type === "bshow") {
 				// Render binary visualization
 				renderBShow(result.coords, sheet, terminal);
+			} else if (result.type === "demo") {
+				// Execute demo script line by line (same logic as drag-and-drop)
+				terminal.writeln("Loading demo...\r\n");
+				const lines = result.script.split(/\r?\n/);
+
+				for (const line of lines) {
+					const trimmed = line.trim();
+					if (!trimmed) {
+						continue;
+					}
+
+					// Display and execute the command
+					terminal.write("$ " + trimmed + "\r\n");
+					historyRef.current.push(trimmed);
+					processCommand(trimmed, terminal, sheet);
+				}
+
+				terminal.writeln("\r\nDemo completed\r\n");
 			} else if (result.type === "error") {
 				console.log("Error result:", result);
 

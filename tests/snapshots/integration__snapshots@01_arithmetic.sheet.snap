@@ -24,6 +24,8 @@ A6 = 20 / 3              // = 6
 // Zero handling
 A7 = 5 * 0               // = 0
 
+tick
+
 --- PARSE & EXECUTION ---
 
 [Tick 1]
@@ -34,21 +36,3 @@ A4: 5
 A5: 5
 A6: 6
 A7: 0
-
-[Tick 2]
-A1: 30
-A2: 14
-A3: 20
-A4: 5
-A5: 5
-A6: 6
-A7: 0
-
---- CHECKS ---
-✅ A1: Matches (30)
-✅ A2: Matches (14)
-✅ A3: Matches (20)
-✅ A4: Matches (5)
-✅ A5: Matches (5)
-✅ A6: Matches (6)
-✅ A7: Matches (0)

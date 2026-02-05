@@ -153,6 +153,12 @@ impl Sheet {
             .map(|(tok, span)| (tok.unwrap_or(Token::Dot), span))
             .collect();
 
+        // Skip lines with no tokens (e.g., comment-only lines) - return empty output
+        if lexed.is_empty() {
+            let result = CommandResult::Output { text: String::new() };
+            return serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL);
+        }
+
         // Create token stream (will have token-index spans)
         let tokens: Vec<Token> = lexed.iter().map(|(tok, _)| tok.clone()).collect();
         let token_stream = Stream::from_iter(tokens.into_iter());
@@ -169,6 +175,9 @@ impl Sheet {
                             .map(|c| c.to_cell_name())
                             .collect();
                         CommandResult::BShow { coords: coord_names }
+                    }
+                    crate::command::CommandResult::Demo(script) => {
+                        CommandResult::Demo { script }
                     }
                     crate::command::CommandResult::Exit => {
                         CommandResult::Exit
@@ -244,6 +253,7 @@ impl Sheet {
 enum CommandResult {
     Output { text: String },
     BShow { coords: Vec<String> },
+    Demo { script: String },
     Exit,
     Error {
         message: String,

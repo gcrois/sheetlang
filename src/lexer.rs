@@ -3,6 +3,8 @@ use std::fmt;
 
 #[derive(Logos, Clone, Debug, PartialEq)]
 #[logos(skip r"[ \t\n\f]+")] // Skip whitespace
+#[logos(skip r"//[^\n]*")] // Skip line comments
+#[logos(skip r"/\*([^*]|\*[^/])*\*/")] // Skip block comments
 pub enum Token {
     // Arithmetic
     #[token("+")]

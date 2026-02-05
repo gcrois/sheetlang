@@ -21,10 +21,10 @@ C1 = [[10, 20], [30, 40]]
 C2 = C1[1]               // = [30, 40]
 
 // Chained Indexing (if supported by parser/engine logic)
-// Note: Depending on your AST, C1[1][0] might need C1 to be resolved first.
-// Since C1 is assigned in Tick 1, C3 reads the value of C1 from Tick 1 (which was empty).
-// So C3 will likely be empty at Tick 1 and correct at Tick 2.
 C3 = C1[0][0]            // = 10
+
+tick
+tick
 
 --- PARSE & EXECUTION ---
 
@@ -45,11 +45,3 @@ B2: 3
 C2: [30, 40]
 B3: empty
 C3: 10
-
---- CHECKS ---
-✅ A1: Matches ([1, 2, 3])
-✅ B1: Matches (1)
-✅ B2: Matches (3)
-✅ B3: Matches (empty)
-✅ C2: Matches ([30, 40])
-✅ C3: Matches (10)

@@ -12,3 +12,6 @@ B3 = A1.z                // = empty
 C1 = { meta: { id: 55 } }
 // Access nested
 C2 = C1.meta.id          // = 55
+
+tick
+tick
