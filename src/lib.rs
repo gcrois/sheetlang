@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod collaborative;
 pub mod command;
 pub mod interpreter;
 pub mod lexer;

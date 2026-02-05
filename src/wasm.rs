@@ -1,5 +1,6 @@
 use wasm_bindgen::prelude::*;
-use crate::interpreter::Engine;
+use crate::collaborative::{CellContent, CollaborationSession, compute_grid_at_tick};
+use crate::interpreter::{Coord, Engine};
 use crate::parser::parser;
 use crate::lexer::Token;
 use chumsky::Parser;
@@ -9,6 +10,7 @@ use serde::Serialize;
 
 #[wasm_bindgen]
 pub struct Sheet {
+    session: CollaborationSession,
     engine: Engine,
 }
 
@@ -17,29 +19,44 @@ impl Sheet {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
+            session: CollaborationSession::new(),
             engine: Engine::new(),
         }
     }
 
+    /// Set a formula or value for a cell
+    /// This records the edit in the timeline at the current tick
     pub fn set_formula(&mut self, cell: &str, input: &str) -> Result<(), String> {
-        let token_iter = Token::lexer(input)
-            .spanned()
-            .map(|(tok, _span)| tok.unwrap_or(Token::Dot)); 
-        
-        let token_stream = chumsky::input::Stream::from_iter(token_iter);
+        // Parse the cell coordinate
+        let coord = Coord::from_str(cell)
+            .ok_or_else(|| format!("Invalid cell reference: {}", cell))?;
 
-        match parser().parse(token_stream).into_result() {
-            Ok(expr) => {
-                self.engine.set_formula(cell, expr)
-            }
-            Err(errs) => {
-                Err(format!("Parse error: {:?}", errs))
-            }
-        }
+        // Determine content type
+        let content = if input.is_empty() {
+            CellContent::Empty
+        } else if let Ok(n) = input.parse::<i64>() {
+            // Try to parse as number first
+            CellContent::Number(n)
+        } else {
+            // Otherwise treat as formula
+            CellContent::Formula(input.to_string())
+        };
+
+        // Record in timeline
+        self.session.set_cell(coord, content);
+
+        // Immediately recompute to show result
+        let tick = self.session.current_tick();
+        compute_grid_at_tick(&self.session, &mut self.engine, tick)
     }
 
+    /// Advance one tick and recompute the grid
     pub fn tick(&mut self) {
-        self.engine.tick();
+        self.session.tick();
+
+        // Recompute grid at new tick
+        let tick = self.session.current_tick();
+        compute_grid_at_tick(&self.session, &mut self.engine, tick).ok();
     }
 
     pub fn tick_range(&mut self, range: &str) -> Result<(), String> {
@@ -243,6 +260,39 @@ impl Sheet {
         };
 
         serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)
+    }
+
+    // --- Collaboration Methods ---
+
+    /// Export the timeline for network synchronization
+    /// Returns a byte array that can be sent to other clients
+    pub fn export_updates(&self) -> Result<Vec<u8>, String> {
+        self.session.export_updates()
+    }
+
+    /// Import timeline updates from another client
+    /// Automatically recomputes the grid after importing
+    pub fn import_updates(&mut self, data: &[u8]) -> Result<(), String> {
+        self.session.import_updates(data)?;
+
+        // Recompute grid at current tick after importing
+        let tick = self.session.current_tick();
+        compute_grid_at_tick(&self.session, &mut self.engine, tick)
+    }
+
+    /// Get the current tick number
+    pub fn get_current_tick(&self) -> u64 {
+        self.session.current_tick()
+    }
+
+    /// Set the peer ID for this client (for conflict resolution)
+    pub fn set_peer_id(&mut self, peer_id: u64) -> Result<(), String> {
+        self.session.set_peer_id(peer_id)
+    }
+
+    /// Get the peer ID of this client
+    pub fn get_peer_id(&self) -> u64 {
+        self.session.peer_id()
     }
 }
 
