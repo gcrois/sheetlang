@@ -254,37 +254,7 @@ function App() {
 		const trimmed = input.trim();
 
 		try {
-			// Handle 'help' command
-			if (trimmed === "help") {
-				terminal.writeln("SheetLang Commands:");
-				terminal.writeln("  A1 = <formula>       - Set a formula for a cell");
-				terminal.writeln("  A1:J10 = <formula>   - Set a formula for a range (slice)");
-				terminal.writeln("  tick                 - Advance the engine one step");
-				terminal.writeln("  show                 - Display all cell values");
-				terminal.writeln("  bshow A1:C3          - Display binary grid visualization");
-				terminal.writeln("  encode               - Generate shareable URL from history");
-				terminal.writeln("  help                 - Show this help message");
-				terminal.writeln("  exit                 - (not implemented in web)");
-				terminal.writeln("");
-				terminal.writeln("Examples:");
-				terminal.writeln("  A1 = 10");
-				terminal.writeln("  B1 = A1 + 5");
-				terminal.writeln("  A1:C3 = @[0,0] * 2");
-				terminal.writeln("  tick");
-				terminal.writeln("  show");
-				terminal.writeln("  bshow A1:C3");
-				terminal.writeln("  encode");
-				terminal.writeln("");
-				try {
-					const buildTime = (Sheet as any).build_timestamp?.() || "unknown";
-					terminal.writeln(`WASM build: ${buildTime}`);
-				} catch (e) {
-					terminal.writeln("WASM build: unknown (rebuild required)");
-				}
-				return;
-			}
-
-			// Handle 'encode' command
+			// Special handling for 'encode' - needs access to history
 			if (trimmed === "encode") {
 				const history = historyRef.current;
 				if (history.length === 0) {
@@ -311,106 +281,102 @@ function App() {
 				return;
 			}
 
-			// Handle 'tick' command
-			if (trimmed === "tick") {
-				sheet.tick();
-				terminal.writeln("Tick processed.");
+			// Use unified WASM command execution for everything else
+			const result = sheet.execute_command?.(trimmed);
+			if (!result) {
+				terminal.writeln("Error: execute_command not available (rebuild WASM)");
 				return;
 			}
 
-			// Handle 'show' command
-			if (trimmed === "show") {
-				terminal.writeln("Current State:");
-				const values = sheet.get_all_values();
-				if (values.trim()) {
-					const lines = values.split("\n").filter((line) => line.trim());
-					lines.forEach((line) => terminal.writeln(line));
-				} else {
-					terminal.writeln("(empty)");
-				}
-				return;
-			}
+			// Handle result based on type
+			if (result.type === "output") {
+				const lines = result.text.split("\n");
+				lines.forEach((line: string) => {
+					if (line) terminal.writeln(line);
+				});
+			} else if (result.type === "bshow") {
+				// Render binary visualization
+				renderBShow(result.coords, sheet, terminal);
+			} else if (result.type === "error") {
+				console.log("Error result:", result);
 
-			// Handle 'bshow' command (bshow A1:C3)
-			const bShowMatch = trimmed.match(/^bshow\s+([A-Z])(\d+):([A-Z])(\d+)$/i);
-			if (bShowMatch) {
-				const [, startCol, startRow, endCol, endRow, widthStr] = bShowMatch;
-				const startColNum = startCol.charCodeAt(0) - 65; // A=0
-				const endColNum = endCol.charCodeAt(0) - 65;
-				const startRowNum = parseInt(startRow);
-				const endRowNum = parseInt(endRow);
-				const cellWidth = 2;
-
-				// Read values from the grid
-				const grid: boolean[][] = [];
-				for (let row = startRowNum; row <= endRowNum; row++) {
-					const gridRow: boolean[] = [];
-					for (let col = startColNum; col <= endColNum; col++) {
-						const cell = String.fromCharCode(65 + col) + row;
-						const value = sheet.get_value(cell);
-						// Truthy: not "empty", not "0", not empty string
-						const isTruthy = value !== "empty" && value !== "0" && value.trim() !== "";
-						gridRow.push(isTruthy);
-					}
-					grid.push(gridRow);
+				// Highlight the error position if span info is available
+				if (result.span_start !== undefined && result.span_end !== undefined) {
+					// Account for the prompt "$ " (2 characters) when positioning the indicator
+					const promptLength = 2;
+					const spanLength = Math.max(1, result.span_end - result.span_start);
+					const indicator = " ".repeat(promptLength + result.span_start) + "\x1b[31m" + "^".repeat(spanLength) + "\x1b[0m";
+					terminal.writeln(indicator);
 				}
 
-				// Display the grid
-				const fullBlock = "█";
-				const emptyBlock = " ";
-
-				// Top border
-				terminal.writeln("┌" + "─".repeat((endColNum - startColNum + 1) * cellWidth) + "┐");
-
-				// Grid rows
-				for (const row of grid) {
-					const rowStr = row.map(isTruthy =>
-						(isTruthy ? fullBlock : emptyBlock).repeat(cellWidth)
-					).join("");
-					terminal.writeln("│" + rowStr + "│");
-				}
-
-				// Bottom border
-				terminal.writeln("└" + "─".repeat((endColNum - startColNum + 1) * cellWidth) + "┘");
-				return;
+				terminal.writeln(`Error: ${result.message}`);
+			} else if (result.type === "exit") {
+				terminal.writeln("Exit command is only available in the REPL");
 			}
-
-			// Try to parse as slice/range assignment (A1:J10 = ...)
-			const sliceMatch = trimmed.match(/^([A-Z])(\d+):([A-Z])(\d+)\s*=\s*(.+)$/);
-			if (sliceMatch) {
-				const [, startCol, startRow, endCol, endRow, formula] = sliceMatch;
-				const startColNum = startCol.charCodeAt(0) - 65; // A=0
-				const endColNum = endCol.charCodeAt(0) - 65;
-				const startRowNum = parseInt(startRow);
-				const endRowNum = parseInt(endRow);
-
-				let count = 0;
-				for (let row = startRowNum; row <= endRowNum; row++) {
-					for (let col = startColNum; col <= endColNum; col++) {
-						const cell = String.fromCharCode(65 + col) + row;
-						sheet.set_formula(cell, formula);
-						count++;
-					}
-				}
-				terminal.writeln(`Formula set for ${count} cells`);
-				return;
-			}
-
-			// Try to parse as single cell assignment (A1 = ...)
-			const assignMatch = trimmed.match(/^([A-Z]\d+)\s*=\s*(.+)$/);
-			if (assignMatch) {
-				const [, cell, formula] = assignMatch;
-				sheet.set_formula(cell, formula);
-				terminal.writeln(`Formula set for ${cell}`);
-				return;
-			}
-
-			// If we get here, unknown command
-			terminal.writeln(`Unknown command: ${trimmed}`);
-			terminal.writeln(`Type 'help' for available commands`);
 		} catch (e) {
 			terminal.writeln(`Error: ${e}`);
 		}
+	};
+
+	const renderBShow = (coords: string[], sheet: Sheet, terminal: Terminal) => {
+		if (!coords || coords.length === 0) {
+			terminal.writeln("(empty)");
+			return;
+		}
+
+		// Parse coordinates and find bounds
+		const parsedCoords = coords.map(c => {
+			const match = c.match(/^([A-Z])(\d+)$/);
+			if (!match) return null;
+			return {
+				col: match[1].charCodeAt(0) - 65,
+				row: parseInt(match[2])
+			};
+		}).filter(c => c !== null);
+
+		if (parsedCoords.length === 0) {
+			terminal.writeln("(empty)");
+			return;
+		}
+
+		const startColNum = Math.min(...parsedCoords.map(c => c!.col));
+		const endColNum = Math.max(...parsedCoords.map(c => c!.col));
+		const startRowNum = Math.min(...parsedCoords.map(c => c!.row));
+		const endRowNum = Math.max(...parsedCoords.map(c => c!.row));
+
+		const cellWidth = 2;
+
+		// Read values from the grid
+		const grid: boolean[][] = [];
+		for (let row = startRowNum; row <= endRowNum; row++) {
+			const gridRow: boolean[] = [];
+			for (let col = startColNum; col <= endColNum; col++) {
+				const cell = String.fromCharCode(65 + col) + row;
+				const value = sheet.get_value(cell);
+				// Truthy: not "empty", not "0", not empty string
+				const isTruthy = value !== "empty" && value !== "0" && value.trim() !== "";
+				gridRow.push(isTruthy);
+			}
+			grid.push(gridRow);
+		}
+
+		// Display the grid
+		const fullBlock = "█";
+		const emptyBlock = " ";
+
+		// Top border
+		terminal.writeln("┌" + "─".repeat((endColNum - startColNum + 1) * cellWidth) + "┐");
+
+		// Grid rows
+		for (const row of grid) {
+			const rowStr = row.map(isTruthy =>
+				(isTruthy ? fullBlock : emptyBlock).repeat(cellWidth)
+			).join("");
+			terminal.writeln("│" + rowStr + "│");
+		}
+
+		// Bottom border
+		terminal.writeln("└" + "─".repeat((endColNum - startColNum + 1) * cellWidth) + "┘");
 	};
 
 	return (

@@ -31,6 +31,44 @@ impl Coord {
             row: self.row + dy,
         }
     }
+
+    pub fn to_cell_name(&self) -> String {
+        let col_char = (b'A' + self.col as u8) as char;
+        format!("{}{}", col_char, self.row + 1)
+    }
+}
+
+// Parse a range like "A1:C3" into a list of coordinates
+pub fn parse_range(s: &str) -> Option<Vec<Coord>> {
+    let parts: Vec<&str> = s.split(':').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let start = Coord::from_str(parts[0])?;
+    let end = Coord::from_str(parts[1])?;
+
+    let mut result = Vec::new();
+
+    let (start_col, end_col) = if start.col <= end.col {
+        (start.col, end.col)
+    } else {
+        (end.col, start.col)
+    };
+
+    let (start_row, end_row) = if start.row <= end.row {
+        (start.row, end.row)
+    } else {
+        (end.row, start.row)
+    };
+
+    for row in start_row..=end_row {
+        for col in start_col..=end_col {
+            result.push(Coord { col, row });
+        }
+    }
+
+    Some(result)
 }
 
 // --- The Engine ---
@@ -71,6 +109,38 @@ impl Engine {
         }
 
         self.state_curr = next_tick_vals;
+    }
+
+    pub fn tick_range(&mut self, coords: &[Coord]) {
+        let new_prev = self.state_curr.clone();
+        self.state_prev = new_prev;
+
+        let mut next_tick_vals = self.state_prev.clone();
+
+        // Only evaluate formulas for cells in the specified range
+        for coord in coords {
+            if let Some(expr) = self.formulas.get(coord) {
+                let val = self.eval(expr, &self.state_prev, Some(*coord), &HashMap::new());
+                next_tick_vals.insert(*coord, val);
+            }
+        }
+
+        self.state_curr = next_tick_vals;
+    }
+
+    pub fn get_values_in_range(&self, coords: &[Coord]) -> Vec<(Coord, Value)> {
+        coords
+            .iter()
+            .filter_map(|coord| {
+                self.state_curr
+                    .get(coord)
+                    .map(|val| (*coord, val.clone()))
+            })
+            .collect()
+    }
+
+    pub fn get_all_coords(&self) -> Vec<Coord> {
+        self.state_curr.keys().copied().collect()
     }
 
     fn eval(

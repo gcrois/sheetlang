@@ -1,19 +1,20 @@
-use ariadne::{Color, Label, Report, ReportKind, Source}; // Cleaned up unused imports
-use ast::{Expr, Value};
+use ariadne::{Color, Label, Report, ReportKind, Source};
+use ast::Value;
 use chumsky::input::Stream;
 use chumsky::prelude::*;
+use command::{Command, CommandResult};
 use interpreter::Engine;
 use lexer::Token;
 use logos::Logos;
 use rustyline::DefaultEditor;
-use sheetlang::{ast, interpreter, lexer, parser};
+use sheetlang::{ast, command, interpreter, lexer};
 
 fn main() {
     let mut rl = DefaultEditor::new().unwrap();
     let mut engine = Engine::new();
 
     println!("SheetLang");
-    println!("Commands: 'tick', 'show', or assignments 'A1 = ...'");
+    println!("Type 'help' for available commands");
 
     loop {
         let readline = rl.readline(">> ");
@@ -23,82 +24,25 @@ fn main() {
                 if line_str.is_empty() {
                     continue;
                 }
-                if line_str == "exit" {
-                    break;
-                }
 
-                if line_str == "tick" {
-                    engine.tick();
-                    println!("Tick processed.");
-                    continue;
-                }
-
-                if line_str == "show" {
-                    println!("Current State:");
-                    for (coord, val) in &engine.state_curr {
-                        let col_char = (b'A' + coord.col as u8) as char;
-                        println!("{}{}: {}", col_char, coord.row + 1, val);
-                    }
-                    continue;
-                }
-
+                // Parse the command
                 let token_iter = Token::lexer(line_str)
                     .spanned()
                     .map(|(tok, _span)| tok.unwrap_or(Token::Dot));
                 let input = Stream::from_iter(token_iter);
-                let parse_result = parser::parser().parse(input);
+
+                let cmd_parser = command::command_parser();
+                let parse_result = cmd_parser.parse(input);
 
                 match parse_result.into_result() {
-                    Ok(expr) => match expr {
-                        Expr::RangeAssign(range, body) => {
-                            let expanded_coords = range.expand();
-                            let mut count = 0;
-
-                            match &*body {
-                                Expr::Array(items) => {
-                                    // Array expansion
-                                    for (i, coord) in expanded_coords.iter().enumerate() {
-                                        if let Some(item_expr) = items.get(i) {
-                                            if let Err(e) = engine.set_formula(coord, item_expr.clone()) {
-                                                println!("Error setting {}: {}", coord, e);
-                                            } else {
-                                                count += 1;
-                                            }
-                                        } else {
-                                            // Array too short, use Empty
-                                            if let Err(e) = engine.set_formula(coord, Expr::Literal(Value::Empty)) {
-                                                println!("Error setting {}: {}", coord, e);
-                                            } else {
-                                                count += 1;
-                                            }
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    // Broadcast
-                                    for coord in expanded_coords.iter() {
-                                        if let Err(e) = engine.set_formula(coord, (*body).clone()) {
-                                            println!("Error setting {}: {}", coord, e);
-                                        } else {
-                                            count += 1;
-                                        }
-                                    }
-                                }
+                    Ok(cmd) => {
+                        if let Err(e) = execute_command(cmd, &mut engine) {
+                            if e == "exit" {
+                                break;
                             }
-
-                            println!("Formula set for {} cells", count);
+                            println!("Error: {}", e);
                         }
-                        Expr::Assign(target, body) => {
-                            if let Err(e) = engine.set_formula(&target, *body) {
-                                println!("Error: {}", e);
-                            } else {
-                                println!("Formula set for {}", target);
-                            }
-                        }
-                        _ => {
-                            println!("Expression parsed (use 'A1 = ...' to assign): {:?}", expr);
-                        }
-                    },
+                    }
                     Err(errors) => {
                         for err in errors {
                             Report::build(ReportKind::Error, ((), err.span().into_range()))
@@ -118,4 +62,71 @@ fn main() {
             Err(_) => break,
         }
     }
+}
+
+fn execute_command(cmd: Command, engine: &mut Engine) -> Result<(), String> {
+    match cmd.execute(engine) {
+        CommandResult::Output(text) => {
+            print!("{}", text);
+            Ok(())
+        }
+        CommandResult::BShow(coords) => {
+            render_bshow(&coords, engine);
+            Ok(())
+        }
+        CommandResult::Exit => Err("exit".to_string()),
+    }
+}
+
+fn render_bshow(coords: &[interpreter::Coord], engine: &Engine) {
+    if coords.is_empty() {
+        println!("(empty)");
+        return;
+    }
+
+    // Find bounds
+    let min_col = coords.iter().map(|c| c.col).min().unwrap();
+    let max_col = coords.iter().map(|c| c.col).max().unwrap();
+    let min_row = coords.iter().map(|c| c.row).min().unwrap();
+    let max_row = coords.iter().map(|c| c.row).max().unwrap();
+
+    // Build grid
+    let width = (max_col - min_col + 1) as usize;
+    let height = (max_row - min_row + 1) as usize;
+    let mut grid = vec![vec![false; width]; height];
+
+    for coord in coords {
+        if let Some(val) = engine.state_curr.get(coord) {
+            let is_truthy = match val {
+                Value::Empty => false,
+                Value::Int(n) => *n != 0,
+                Value::Bool(b) => *b,
+                _ => true,
+            };
+            let grid_row = (coord.row - min_row) as usize;
+            let grid_col = (coord.col - min_col) as usize;
+            grid[grid_row][grid_col] = is_truthy;
+        }
+    }
+
+    // Display
+    let cell_width = 2;
+    let full_block = "█";
+    let empty_block = " ";
+
+    println!("┌{}┐", "─".repeat(width * cell_width));
+    for row in &grid {
+        let row_str: String = row
+            .iter()
+            .map(|&is_truthy| {
+                if is_truthy {
+                    full_block.repeat(cell_width)
+                } else {
+                    empty_block.repeat(cell_width)
+                }
+            })
+            .collect();
+        println!("│{}│", row_str);
+    }
+    println!("└{}┘", "─".repeat(width * cell_width));
 }
