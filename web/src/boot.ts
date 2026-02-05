@@ -1,6 +1,6 @@
 const PAGES_SUFFIX = ".pages.dev";
 const PROBE_TIMEOUT_MS = 2500;
-const ENTRY_SCRIPT_REGEX = /<script[^>]+type=["']module["'][^>]+src=["']([^"']+)["'][^>]*>/i;
+const PREVIEW_BOOT_FLAG = "__sheetlang_preview_bootstrap__";
 
 const loadMain = async () => {
     await import("./main.tsx");
@@ -29,15 +29,6 @@ const getRouteSegment = (pathname: string) => {
     return parts.length > 0 ? parts[0] : null;
 };
 
-const getRemainderPath = (pathname: string) => {
-    const parts = pathname.split("/").filter(Boolean);
-    if (parts.length <= 1) {
-        return "/";
-    }
-
-    return `/${parts.slice(1).join("/")}`;
-};
-
 const resolvePagesHost = () => {
     const envHost = import.meta.env.VITE_PAGES_HOST as string | undefined;
     if (!envHost) {
@@ -60,6 +51,14 @@ const resolvePagesHost = () => {
     return trimmed.replace(/\/.*$/, "");
 };
 
+const isPreviewBootstrap = () => {
+    return Boolean((window as Record<string, unknown>)[PREVIEW_BOOT_FLAG]);
+};
+
+const markPreviewBootstrap = () => {
+    (window as Record<string, unknown>)[PREVIEW_BOOT_FLAG] = true;
+};
+
 const fetchWithTimeout = async (url: string, init: RequestInit = {}) => {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
@@ -75,36 +74,98 @@ const fetchWithTimeout = async (url: string, init: RequestInit = {}) => {
     }
 };
 
-const resolveEntryScript = async (origin: string) => {
+type PreviewAssets = {
+    scriptUrl: string;
+    stylesheetUrls: string[];
+    modulepreloadUrls: string[];
+};
+
+const resolveEntryAssets = async (origin: string) => {
     const response = await fetchWithTimeout(`${origin}/index.html`, { method: "GET" });
     if (!response.ok) {
         return null;
     }
 
     const html = await response.text();
-    const match = html.match(ENTRY_SCRIPT_REGEX);
-    if (!match) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const script = doc.querySelector('script[type="module"][src]');
+    if (!script) {
         return null;
     }
 
-    return new URL(match[1], origin).toString();
+    const scriptSrc = script.getAttribute("src");
+    if (!scriptSrc) {
+        return null;
+    }
+
+    const stylesheetUrls = Array.from(doc.querySelectorAll('link[rel="stylesheet"][href]'))
+        .map((link) => link.getAttribute("href"))
+        .filter((href): href is string => Boolean(href))
+        .map((href) => new URL(href, origin).toString());
+
+    const modulepreloadUrls = Array.from(doc.querySelectorAll('link[rel="modulepreload"][href]'))
+        .map((link) => link.getAttribute("href"))
+        .filter((href): href is string => Boolean(href))
+        .map((href) => new URL(href, origin).toString());
+
+    return {
+        scriptUrl: new URL(scriptSrc, origin).toString(),
+        stylesheetUrls,
+        modulepreloadUrls,
+    } satisfies PreviewAssets;
 };
 
-const probePreviewOrigin = async (origin: string) => {
-    try {
-        const entryUrl = await resolveEntryScript(origin);
-        if (!entryUrl) {
-            return false;
-        }
-
-        const response = await fetchWithTimeout(entryUrl, { method: "GET" });
-        return response.ok;
-    } catch {
-        return false;
+const ensureLinkTag = (rel: string, href: string) => {
+    const selector = `link[rel="${rel}"][href="${href}"]`;
+    if (document.querySelector(selector)) {
+        return null;
     }
+
+    const link = document.createElement("link");
+    link.rel = rel;
+    link.href = href;
+    link.crossOrigin = "anonymous";
+    document.head.appendChild(link);
+    return link;
+};
+
+const loadPreviewAssets = (assets: PreviewAssets) => {
+    const inserted: HTMLElement[] = [];
+
+    for (const href of assets.modulepreloadUrls) {
+        const link = ensureLinkTag("modulepreload", href);
+        if (link) {
+            inserted.push(link);
+        }
+    }
+
+    for (const href of assets.stylesheetUrls) {
+        const link = ensureLinkTag("stylesheet", href);
+        if (link) {
+            inserted.push(link);
+        }
+    }
+
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = assets.scriptUrl;
+    script.crossOrigin = "anonymous";
+    script.addEventListener("error", () => {
+        for (const node of inserted) {
+            node.remove();
+        }
+        script.remove();
+        void loadMain();
+    });
+    document.head.appendChild(script);
 };
 
 const bootstrap = async () => {
+    if (isPreviewBootstrap()) {
+        await loadMain();
+        return;
+    }
+
     const route = getRouteSegment(window.location.pathname);
     if (!route) {
         await loadMain();
@@ -129,17 +190,20 @@ const bootstrap = async () => {
     }
 
     const origin = `https://${slug}.${pagesHost}`;
-    const exists = await probePreviewOrigin(origin);
-    if (!exists) {
+    let assets: PreviewAssets | null = null;
+    try {
+        assets = await resolveEntryAssets(origin);
+    } catch {
+        assets = null;
+    }
+
+    if (!assets) {
         await loadMain();
         return;
     }
 
-    const url = new URL(origin);
-    url.pathname = getRemainderPath(window.location.pathname);
-    url.search = window.location.search;
-    url.hash = window.location.hash;
-    window.location.replace(url.toString());
+    markPreviewBootstrap();
+    loadPreviewAssets(assets);
 };
 
 void bootstrap();

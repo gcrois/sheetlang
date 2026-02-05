@@ -54,8 +54,11 @@ jobs:
                   version: 10
 
             # ─── Install wasm-pack ──────────────────────────────────────────────
+            - name: Install cargo-binstall
+              run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
             - name: Install wasm-pack
-              run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+              run: cargo binstall -y wasm-pack
 
             # ─── Build WASM module ───────────────────────────────────────────────
             - name: Build WASM module
