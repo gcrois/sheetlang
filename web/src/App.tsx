@@ -233,9 +233,79 @@ function App() {
 			tmp_term.open(terminalRef.current!);
 
 			tmp_term.writeln("SheetLang Terminal");
-			const buildInfo = (sheetRef.current as { build_info?: () => string } | null)?.build_info?.();
+			const sheetApi = sheetRef.current as {
+				build_info?: () => string;
+				build_commit_url?: () => string;
+				build_branch_url?: () => string;
+			} | null;
+			const buildInfo = sheetApi?.build_info?.();
+			const commitUrl = sheetApi?.build_commit_url?.();
+			const branchUrl = sheetApi?.build_branch_url?.();
 			if (buildInfo) {
 				tmp_term.writeln(buildInfo);
+
+				const plainBuildInfo = buildInfo.replace(/\x1b\[[0-9;]*m/g, "");
+				const commitMatch = plainBuildInfo.match(/commit\s+([^\s]+)/);
+				const branchMatch = plainBuildInfo.match(/branch\s+([^\s]+)/);
+				const commitDisplay = commitMatch?.[1];
+				const branchDisplay = branchMatch?.[1];
+
+				if ((commitUrl && commitDisplay) || (branchUrl && branchDisplay)) {
+					tmp_term.registerLinkProvider({
+						provideLinks: (y, callback) => {
+							const line = tmp_term.buffer.active.getLine(y);
+							if (!line) {
+								callback(undefined);
+								return;
+							}
+
+							const text = line.translateToString(true);
+							const links: Array<{
+								text: string;
+								range: { start: { x: number; y: number }; end: { x: number; y: number } };
+								activate: () => void;
+							}> = [];
+
+							if (commitUrl && commitDisplay) {
+								const needle = `commit ${commitDisplay}`;
+								const startIndex = text.indexOf(needle);
+								if (startIndex !== -1) {
+									const endIndex = startIndex + needle.length - 1;
+									links.push({
+										text: commitUrl,
+										range: {
+											start: { x: startIndex, y },
+											end: { x: endIndex, y },
+										},
+										activate: () => {
+											window.open(commitUrl, "_blank", "noopener,noreferrer");
+										},
+									});
+								}
+							}
+
+							if (branchUrl && branchDisplay) {
+								const needle = `branch ${branchDisplay}`;
+								const startIndex = text.indexOf(needle);
+								if (startIndex !== -1) {
+									const endIndex = startIndex + needle.length - 1;
+									links.push({
+										text: branchUrl,
+										range: {
+											start: { x: startIndex, y },
+											end: { x: endIndex, y },
+										},
+										activate: () => {
+											window.open(branchUrl, "_blank", "noopener,noreferrer");
+										},
+									});
+								}
+							}
+
+							callback(links.length > 0 ? links : undefined);
+						},
+					});
+				}
 			}
 			tmp_term.writeln("A reactive spreadsheet programming language");
 			tmp_term.writeln("");

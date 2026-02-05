@@ -132,6 +132,14 @@ impl Sheet {
         crate::command::build_info_line()
     }
 
+    pub fn build_commit_url(&self) -> String {
+        env!("BUILD_GIT_COMMIT_URL").to_string()
+    }
+
+    pub fn build_branch_url(&self) -> String {
+        env!("BUILD_GIT_BRANCH_URL").to_string()
+    }
+
     pub fn get_help() -> String {
         crate::command::Command::format_help()
     }

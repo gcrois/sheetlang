@@ -389,18 +389,51 @@ pub fn build_info_line() -> String {
     let time = env!("BUILD_TIME");
     let branch = env!("BUILD_GIT_BRANCH");
     let commit = env!("BUILD_GIT_HASH");
+    let commit_url = env!("BUILD_GIT_COMMIT_URL");
+    let branch_url = env!("BUILD_GIT_BRANCH_URL");
+    let dirty = env!("BUILD_GIT_DIRTY") == "1";
 
     let branch_display = if branch.is_empty() { "dev" } else { branch };
-    let commit_display = if commit.is_empty() { "dev" } else { commit };
+    let commit_display = if commit.is_empty() {
+        "dev".to_string()
+    } else if dirty {
+        format!("{}*", commit)
+    } else {
+        commit.to_string()
+    };
     let time_display = if time.is_empty() { "unknown" } else { time };
+    let out = if cfg!(target_arch = "wasm32") {
+        format!(
+            "Build: {} {} · \x1b[4;34mbranch {}\x1b[0m · \x1b[4;34mcommit {}\x1b[0m",
+            date,
+            time_display,
+            branch_display,
+            commit_display.as_str()
+        )
+    } else {
+        format!(
+            "Build: {} {} · branch {} · commit {}",
+            date,
+            time_display,
+            branch_display,
+            commit_display.as_str()
+        )
+    };
 
-    format!(
-        "Build: {} {} · branch {} · commit {}",
-        date,
-        time_display,
-        branch_display,
-        commit_display
-    )
+    let mut out = out;
+
+    if !cfg!(target_arch = "wasm32") {
+        if !commit_url.is_empty() && commit != "dev" {
+            out.push('\n');
+            out.push_str(commit_url);
+        }
+        if !branch_url.is_empty() && branch != "dev" {
+            out.push('\n');
+            out.push_str(branch_url);
+        }
+    }
+
+    out
 }
 
 // Include generated demo scripts code
