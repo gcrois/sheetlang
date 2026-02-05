@@ -102,6 +102,12 @@ resource "github_actions_variable" "cf_project_name" {
   value         = var.project_name
 }
 
+resource "github_actions_variable" "vite_pages_host" {
+  repository    = var.repo_name
+  variable_name = "VITE_PAGES_HOST"
+  value         = "${cloudflare_pages_project.static_site.subdomain}"
+}
+
 resource "github_actions_variable" "cf_output_dir" {
   repository    = var.repo_name
   variable_name = "CLOUDFLARE_OUTPUT_DIR"

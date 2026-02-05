@@ -2,7 +2,7 @@ name: Deploy
 
 on:
     push:
-        branches: ["main"]
+        branches: ["**"]
     workflow_dispatch:
 
 permissions:
@@ -10,7 +10,7 @@ permissions:
     deployments: write
 
 concurrency:
-    group: "pages"
+    group: "pages-${{ github.ref_name }}"
     cancel-in-progress: true
 
 jobs:
@@ -69,6 +69,20 @@ jobs:
             - name: Build
               working-directory: ./web
               run: pnpm build
+              env:
+                  VITE_PAGES_HOST: ${{ vars.VITE_PAGES_HOST }}
+
+            - name: Derive Pages branch slug
+              id: pages_branch
+              run: |
+                  set -euo pipefail
+                  raw_branch="${GITHUB_REF_NAME}"
+                  slug="$(printf "%s" "${raw_branch}" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9-]+#-#g; s#-+#-#g; s#^-+|-+$##g')"
+                  if [ -z "${slug}" ]; then
+                    echo "Slug resolved to empty. Branch: ${raw_branch}" >&2
+                    exit 1
+                  fi
+                  echo "slug=${slug}" >> "${GITHUB_OUTPUT}"
 
             - name: Deploy to Cloudflare Pages
               uses: cloudflare/wrangler-action@v3
@@ -78,4 +92,4 @@ jobs:
                 command: >
                     pages deploy ${{ vars.CLOUDFLARE_OUTPUT_DIR }}
                     --project-name ${{ vars.CLOUDFLARE_PROJECT_NAME }}
-                    --branch main
+                    --branch ${{ steps.pages_branch.outputs.slug }}
