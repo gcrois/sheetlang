@@ -404,7 +404,7 @@ pub fn build_info_line() -> String {
     let time_display = if time.is_empty() { "unknown" } else { time };
     let out = if cfg!(target_arch = "wasm32") {
         format!(
-            "Build: {} {} · \x1b[4;34mbranch {}\x1b[0m · \x1b[4;34mcommit {}\x1b[0m",
+            "Build: {} {} CADE SUCKS · \x1b[4;34mbranch {}\x1b[0m · \x1b[4;34mcommit {}\x1b[0m",
             date,
             time_display,
             branch_display,
