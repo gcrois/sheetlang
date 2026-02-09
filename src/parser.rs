@@ -72,19 +72,21 @@ where
                 CellRange { start, end, step }
             });
 
-        // Relative Ref
+        let coord_vec = signed_int
+            .separated_by(just(Token::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LBracket), just(Token::RBracket));
+
+        // Absolute Ref: #[i, j, k]
+        let abs_ref = just(Token::Hash)
+            .ignore_then(coord_vec.clone())
+            .map(Expr::AbsRef);
+
+        // Relative Ref: @[dx, dy, ...]
         let rel_ref = just(Token::At)
-            .ignore_then(
-                signed_int
-                    .separated_by(just(Token::Comma))
-                    .collect::<Vec<_>>()
-                    .delimited_by(just(Token::LBracket), just(Token::RBracket)),
-            )
-            .map(|coords| {
-                let dx = coords.get(0).cloned().unwrap_or(0);
-                let dy = coords.get(1).cloned().unwrap_or(0);
-                Expr::RelRef(dx, dy)
-            });
+            .ignore_then(coord_vec.clone())
+            .map(Expr::RelRef);
 
         let array = expr
             .clone()
@@ -119,7 +121,7 @@ where
             .then(expr.clone())
             .map(|(args, body)| Expr::Lambda(args, Box::new(body)));
 
-        let atom = choice((lambda, rel_ref, val, array, dict, grouping)).boxed();
+        let atom = choice((lambda, abs_ref, rel_ref, val, array, dict, grouping)).boxed();
 
         let call_op = expr
             .clone()

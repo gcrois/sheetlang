@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Literal(Value),
     Ref(String),
-    RelRef(i32, i32),
+    AbsRef(Vec<i32>),
+    RelRef(Vec<i32>),
     Binary(Box<Expr>, Op, Box<Expr>),
     Unary(Op, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -17,6 +19,12 @@ pub enum Expr {
     Call(Box<Expr>, Vec<Expr>),
     Assign(String, Box<Expr>),
     RangeAssign(CellRange, Box<Expr>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewCapture {
+    pub axes: [usize; 2],
+    pub offset: Vec<i32>,
 }
 
 // Represents a single cell coordinate (A1, B2, etc.)
@@ -179,8 +187,22 @@ pub enum Value {
     Array(Vec<Value>),
     Dict(Vec<(String, Value)>),
     Range(i64, i64),
-    Lambda(Vec<String>, Box<Expr>),
+    Closure {
+        params: Vec<String>,
+        body: Box<Expr>,
+        env: HashMap<String, Value>,
+        bound: Vec<Value>,
+        tensor: String,
+        view: ViewCapture,
+    },
+    Effect(Effect),
     Error(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Effect {
+    Tick,
+    TickRange(CellRange),
 }
 
 impl fmt::Display for Value {
@@ -211,7 +233,8 @@ impl fmt::Display for Value {
                 write!(f, " }}")
             }
             Value::Range(s, e) => write!(f, "{}..{}", s, e),
-            Value::Lambda(_, _) => write!(f, "<fn>"),
+            Value::Closure { .. } => write!(f, "<fn>"),
+            Value::Effect(_) => write!(f, "<effect>"),
             Value::Error(e) => write!(f, "#ERR: {}", e),
         }
     }

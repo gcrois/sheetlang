@@ -134,27 +134,45 @@ fn render_bshow(coords: &[interpreter::Coord], engine: &Engine) {
         return;
     }
 
+    let coords_2d: Vec<(i32, i32)> = coords
+        .iter()
+        .filter_map(|c| c.as_2d())
+        .collect();
+    if coords_2d.is_empty() {
+        println!("(empty)");
+        return;
+    }
+
     // Find bounds
-    let min_col = coords.iter().map(|c| c.col).min().unwrap();
-    let max_col = coords.iter().map(|c| c.col).max().unwrap();
-    let min_row = coords.iter().map(|c| c.row).min().unwrap();
-    let max_row = coords.iter().map(|c| c.row).max().unwrap();
+    let min_col = coords_2d.iter().map(|c| c.0).min().unwrap();
+    let max_col = coords_2d.iter().map(|c| c.0).max().unwrap();
+    let min_row = coords_2d.iter().map(|c| c.1).min().unwrap();
+    let max_row = coords_2d.iter().map(|c| c.1).max().unwrap();
 
     // Build grid
     let width = (max_col - min_col + 1) as usize;
     let height = (max_row - min_row + 1) as usize;
     let mut grid = vec![vec![false; width]; height];
 
+    let tensor = engine.tensors.get(&engine.active).expect("active tensor missing");
     for coord in coords {
-        if let Some(val) = engine.state_curr.get(coord) {
+        let (col, row) = match coord.as_2d() {
+            Some(v) => v,
+            None => continue,
+        };
+        let nd = match engine.map_view_coord(coord) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        if let Some(val) = tensor.state_curr.get(&nd) {
             let is_truthy = match val {
                 Value::Empty => false,
                 Value::Int(n) => *n != 0,
                 Value::Bool(b) => *b,
                 _ => true,
             };
-            let grid_row = (coord.row - min_row) as usize;
-            let grid_col = (coord.col - min_col) as usize;
+            let grid_row = (row - min_row) as usize;
+            let grid_col = (col - min_col) as usize;
             grid[grid_row][grid_col] = is_truthy;
         }
     }

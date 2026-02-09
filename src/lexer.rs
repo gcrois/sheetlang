@@ -55,6 +55,8 @@ pub enum Token {
     Arrow,
     #[token(".")]
     Dot,
+    #[token("#")]
+    Hash,
     #[token("@")]
     At, // For relative refs
     #[token("..")]

@@ -24,7 +24,7 @@ impl Sheet {
     pub fn set_formula(&mut self, cell: &str, input: &str) -> Result<(), String> {
         let token_iter = Token::lexer(input)
             .spanned()
-            .map(|(tok, _span)| tok.unwrap_or(Token::Dot)); 
+            .map(|(tok, _span)| tok.unwrap_or(Token::Dot));
         
         let token_stream = chumsky::input::Stream::from_iter(token_iter);
 
@@ -45,15 +45,26 @@ impl Sheet {
     pub fn tick_range(&mut self, range: &str) -> Result<(), String> {
         let coords = crate::interpreter::parse_range(range)
             .ok_or_else(|| format!("Invalid range: {}", range))?;
-        self.engine.tick_range(&coords);
+        let coords_nd: Vec<Coord> = coords
+            .iter()
+            .filter_map(|c| self.engine.map_view_coord(c).ok())
+            .collect();
+        self.engine.tick_range(&coords_nd);
         Ok(())
     }
 
     pub fn get_value(&self, cell: &str) -> String {
-         if let Some(coord) = crate::interpreter::Coord::from_str(cell) {
-             self.engine.state_curr.get(&coord)
-                 .map(|v| v.to_string())
-                 .unwrap_or_else(|| "empty".to_string())
+         if let Some(coord2d) = crate::interpreter::Coord::from_str(cell) {
+             if let Ok(coord) = self.engine.map_view_coord(&coord2d) {
+                 if let Some(tensor) = self.engine.tensors.get(&self.engine.active) {
+                     return tensor
+                         .state_curr
+                         .get(&coord)
+                         .map(|v| v.to_string())
+                         .unwrap_or_else(|| "empty".to_string());
+                 }
+             }
+             "empty".to_string()
          } else {
              "error".to_string()
          }
@@ -61,21 +72,22 @@ impl Sheet {
 
     pub fn get_all_values(&self) -> String {
         let mut out = String::new();
-        // Convert to vector to sort for deterministic output
-        let mut entries: Vec<_> = self.engine.state_curr.iter().collect();
-        // Sort by row then col
-        entries.sort_by(|(a_coord, _), (b_coord, _)| {
-            let row_cmp = a_coord.row.cmp(&b_coord.row);
+        let coords = self.engine.get_all_coords_in_view();
+        let values = self.engine.get_values_in_range(&coords);
+        let mut sorted_values = values.clone();
+        sorted_values.sort_by(|(a, _), (b, _)| {
+            let (a_col, a_row) = a.as_2d().unwrap_or((0, 0));
+            let (b_col, b_row) = b.as_2d().unwrap_or((0, 0));
+            let row_cmp = a_row.cmp(&b_row);
             if row_cmp == std::cmp::Ordering::Equal {
-                a_coord.col.cmp(&b_coord.col)
+                a_col.cmp(&b_col)
             } else {
                 row_cmp
             }
         });
 
-        for (coord, val) in entries {
-             let col_char = (b'A' + coord.col as u8) as char;
-             out.push_str(&format!("{}{}: {}\n", col_char, coord.row + 1, val));
+        for (coord, val) in sorted_values {
+            out.push_str(&format!("{}: {}\n", coord.to_cell_name(), val));
         }
         out
     }
@@ -90,28 +102,31 @@ impl Sheet {
         let values = self.engine.get_values_in_range(&coords);
         let mut sorted_values = values.clone();
         sorted_values.sort_by(|(a, _), (b, _)| {
-            let row_cmp = a.row.cmp(&b.row);
+            let (a_col, a_row) = a.as_2d().unwrap_or((0, 0));
+            let (b_col, b_row) = b.as_2d().unwrap_or((0, 0));
+            let row_cmp = a_row.cmp(&b_row);
             if row_cmp == std::cmp::Ordering::Equal {
-                a.col.cmp(&b.col)
+                a_col.cmp(&b_col)
             } else {
                 row_cmp
             }
         });
 
         for (coord, val) in sorted_values {
-            let col_char = (b'A' + coord.col as u8) as char;
-            out.push_str(&format!("{}{}: {}\n", col_char, coord.row + 1, val));
+            out.push_str(&format!("{}: {}\n", coord.to_cell_name(), val));
         }
         out
     }
 
     pub fn get_all_coords(&self) -> String {
-        let coords = self.engine.get_all_coords();
+        let coords = self.engine.get_all_coords_in_view();
         let mut sorted_coords = coords.clone();
         sorted_coords.sort_by(|a, b| {
-            let row_cmp = a.row.cmp(&b.row);
+            let (a_col, a_row) = a.as_2d().unwrap_or((0, 0));
+            let (b_col, b_row) = b.as_2d().unwrap_or((0, 0));
+            let row_cmp = a_row.cmp(&b_row);
             if row_cmp == std::cmp::Ordering::Equal {
-                a.col.cmp(&b.col)
+                a_col.cmp(&b_col)
             } else {
                 row_cmp
             }
