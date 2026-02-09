@@ -2,7 +2,7 @@ use ariadne::{Color, Label, Report, ReportKind, Source};
 use ast::Value;
 use chumsky::input::Stream;
 use chumsky::prelude::*;
-use command::{Command, CommandResult};
+use command::CommandResult;
 use interpreter::Engine;
 use lexer::Token;
 use logos::Logos;
@@ -36,57 +36,12 @@ fn main() {
 
                 match parse_result.into_result() {
                     Ok(cmd) => {
-                        match execute_command(cmd, &mut engine) {
-                            Ok(Some(script)) => {
-                                // Execute demo script line by line
-                                println!("Loading demo...\n");
-                                for line in script.lines() {
-                                    let trimmed = line.trim();
-                                    if trimmed.is_empty() {
-                                        continue;
-                                    }
-
-                                    // Lex and collect tokens
-                                    let tokens: Vec<_> = Token::lexer(trimmed)
-                                        .spanned()
-                                        .map(|(tok, _span)| tok.unwrap_or(Token::Dot))
-                                        .collect();
-
-                                    // Skip lines with no tokens (e.g., comment-only lines)
-                                    if tokens.is_empty() {
-                                        continue;
-                                    }
-
-                                    println!(">> {}", trimmed);
-
-                                    // Parse and execute the line
-                                    let input = Stream::from_iter(tokens.into_iter());
-                                    let cmd_parser = command::command_parser();
-                                    let parse_result = cmd_parser.parse(input);
-
-                                    match parse_result.into_result() {
-                                        Ok(inner_cmd) => {
-                                            if let Err(e) = execute_command(inner_cmd, &mut engine) {
-                                                if e == "exit" {
-                                                    break;
-                                                }
-                                                println!("Error: {}", e);
-                                            }
-                                        }
-                                        Err(_) => {
-                                            // Silently skip parse errors in demo
-                                        }
-                                    }
-                                }
-                                println!();
+                        let result = command::execute_with_auto_effects(cmd, &mut engine);
+                        if let Err(e) = handle_result(result, &mut engine) {
+                            if e == "exit" {
+                                break;
                             }
-                            Ok(None) => {}
-                            Err(e) => {
-                                if e == "exit" {
-                                    break;
-                                }
-                                println!("Error: {}", e);
-                            }
+                            println!("Error: {}", e);
                         }
                     }
                     Err(errors) => {
@@ -110,22 +65,70 @@ fn main() {
     }
 }
 
-fn execute_command(cmd: Command, engine: &mut Engine) -> Result<Option<String>, String> {
-    match cmd.execute(engine) {
+fn handle_result(result: CommandResult, engine: &mut Engine) -> Result<(), String> {
+    match result {
         CommandResult::Output(text) => {
             print!("{}", text);
-            Ok(None)
+            Ok(())
         }
         CommandResult::BShow(coords) => {
             render_bshow(&coords, engine);
-            Ok(None)
+            Ok(())
         }
-        CommandResult::Demo(script) => {
-            // Return the script to be executed by the main loop
-            Ok(Some(script))
-        }
+        CommandResult::Demo(script) => run_demo_script(&script, engine),
         CommandResult::Exit => Err("exit".to_string()),
+        CommandResult::Batch(results) => {
+            for result in results {
+                handle_result(result, engine)?;
+            }
+            Ok(())
+        }
     }
+}
+
+fn run_demo_script(script: &str, engine: &mut Engine) -> Result<(), String> {
+    println!("Loading demo...\n");
+    for line in script.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Lex and collect tokens
+        let tokens: Vec<_> = Token::lexer(trimmed)
+            .spanned()
+            .map(|(tok, _span)| tok.unwrap_or(Token::Dot))
+            .collect();
+
+        // Skip lines with no tokens (e.g., comment-only lines)
+        if tokens.is_empty() {
+            continue;
+        }
+
+        println!(">> {}", trimmed);
+
+        // Parse and execute the line
+        let input = Stream::from_iter(tokens.into_iter());
+        let cmd_parser = command::command_parser();
+        let parse_result = cmd_parser.parse(input);
+
+        match parse_result.into_result() {
+            Ok(inner_cmd) => {
+                let result = command::execute_with_auto_effects(inner_cmd, engine);
+                if let Err(e) = handle_result(result, engine) {
+                    if e == "exit" {
+                        return Err(e);
+                    }
+                    println!("Error: {}", e);
+                }
+            }
+            Err(_) => {
+                // Silently skip parse errors in demo
+            }
+        }
+    }
+    println!();
+    Ok(())
 }
 
 fn render_bshow(coords: &[interpreter::Coord], engine: &Engine) {

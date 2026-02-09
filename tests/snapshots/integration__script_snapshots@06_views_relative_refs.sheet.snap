@@ -1,0 +1,32 @@
+---
+source: tests/integration.rs
+expression: output
+input_file: tests/scripts/06_views_relative_refs.sheet
+---
+--- SCRIPT ---
+> // View mapping and relative refs inside a 3D tensor (absolute LHS)
+> alloc rel [4, 4, 2]
+Allocated tensor 'rel'
+> view axes [0,1] offset [0,0,1]
+View axes set to [0, 1]
+View offset set to [0,0,1]
+> #[0,0,1] = 10
+Formula set for 1 cell (#[0,0,1])
+> #[1,0,1] = @[-1, 0] + 1
+Formula set for 1 cell (#[1,0,1])
+> #[2,0,1] = #[0,0,1] + #[1,0,1]
+Formula set for 1 cell (#[2,0,1])
+> tick
+Tick processed.
+
+[Tick 1]
+#[0,0,1]: 10
+#[1,0,1]: empty
+#[2,0,1]: 0
+> tick
+Tick processed.
+
+[Tick 2]
+#[0,0,1]: 10
+#[1,0,1]: 11
+#[2,0,1]: empty

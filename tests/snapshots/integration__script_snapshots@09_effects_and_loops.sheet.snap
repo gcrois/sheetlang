@@ -1,0 +1,67 @@
+---
+source: tests/integration.rs
+expression: output
+input_file: tests/scripts/09_effects_and_loops.sheet
+---
+--- SCRIPT ---
+> // Effects and tick loops with command effects
+> alloc effects_value [3, 1]
+Allocated tensor 'effects_value'
+> // Effect uses spreadsheet value (reads A1 from the new formula)
+> #[0,0] = 7
+Formula set for 1 cell (#[0,0])
+> #[1,0] = effect { #[2,0] = @[-2,0] }
+Formula set for 1 cell (#[1,0])
+> tick
+Tick processed.
+Effects queued: 1
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 1]
+#[0,0]: 7
+#[1,0]: effect { #[2,0] = @[-2,0] }
+> effects run 1
+Formula set for 1 cell (#[2,0])
+Executed 1 effect(s). Pending: 0
+> tick
+Tick processed.
+Effects queued: 1
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 2]
+#[0,0]: 7
+#[1,0]: effect { #[2,0] = @[-2,0] }
+#[2,0]: 7
+> show A1:C1
+Current State (range A1:C1):
+#[0,0]: 7
+#[1,0]: effect { #[2,0] = @[-2,0] }
+#[2,0]: 7
+
+> effects run 10
+Formula set for 1 cell (#[2,0])
+Executed 1 effect(s). Pending: 0
+> alloc effects_tick [2, 1]
+Allocated tensor 'effects_tick'
+> // Effect that triggers a tick
+> #[0,0] = effect { tick }
+Formula set for 1 cell (#[0,0])
+> tick
+Tick processed.
+Effects queued: 1
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 3]
+#[0,0]: effect { tick }
+> effects pending
+Pending effects: 1
+> effects run 1
+Tick processed.
+Effects queued: 1
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 4]
+#[0,0]: effect { tick }
+Executed 1 effect(s). Pending: 1
+> effects pending
+Pending effects: 1

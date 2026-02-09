@@ -1,5 +1,6 @@
 use crate::ast::{Effect, Expr, Op, Value, ViewCapture};
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
 
 // --- Coordinate and View Helpers ---
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -52,6 +53,16 @@ impl Coord {
             }
         }
         format!("#[{}]", self.0.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","))
+    }
+}
+
+impl fmt::Display for Coord {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "#[{}]",
+            self.0.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(",")
+        )
     }
 }
 
@@ -205,6 +216,16 @@ impl Engine {
         }
     }
 
+    pub fn set_formula_coord_in(&mut self, tensor_name: &str, coord: Coord, expr: Expr) -> Result<(), String> {
+        match self.tensors.get_mut(tensor_name) {
+            Some(tensor) => {
+                tensor.formulas.insert(coord, expr);
+                Ok(())
+            }
+            None => Err(format!("Tensor '{}' not found", tensor_name)),
+        }
+    }
+
     pub fn set_input(&mut self, key: &str, value: Value) -> Result<(), String> {
         let coord2d = Coord::from_str(key).ok_or_else(|| format!("Invalid cell reference {}", key))?;
         let coord = self.map_view_coord_with(&self.view, &self.active, &coord2d)?;
@@ -233,14 +254,9 @@ impl Engine {
         let effects = self.tick_internal(None);
         let enqueued = effects.len();
         self.pending_effects.extend(effects);
-        let executed = if self.effect_auto_budget > 0 {
-            self.run_effects_internal(self.effect_auto_budget)
-        } else {
-            0
-        };
         TickResult {
             enqueued_effects: enqueued,
-            executed_effects: executed,
+            executed_effects: 0,
         }
     }
 
@@ -248,19 +264,18 @@ impl Engine {
         let effects = self.tick_internal(Some(coords));
         let enqueued = effects.len();
         self.pending_effects.extend(effects);
-        let executed = if self.effect_auto_budget > 0 {
-            self.run_effects_internal(self.effect_auto_budget)
-        } else {
-            0
-        };
         TickResult {
             enqueued_effects: enqueued,
-            executed_effects: executed,
+            executed_effects: 0,
         }
     }
 
     pub fn pending_effects_len(&self) -> usize {
         self.pending_effects.len()
+    }
+
+    pub fn pop_effect(&mut self) -> Option<Effect> {
+        self.pending_effects.pop_front()
     }
 
     pub fn run_effects(&mut self, limit: usize) -> usize {
@@ -369,6 +384,10 @@ impl Engine {
         self.map_view_coord_with(&self.view, &self.active, coord2d)
     }
 
+    pub fn map_view_coord_in(&self, tensor_name: &str, coord2d: &Coord) -> Result<Coord, String> {
+        self.map_view_coord_with(&self.view, tensor_name, coord2d)
+    }
+
     fn project_to_view(&self, coord: &Coord) -> Option<Coord> {
         let dims = self.active_dims();
         let mut normalized = coord.0.clone();
@@ -466,6 +485,12 @@ impl Engine {
                     let new_effects = self.tick_internal(Some(&coords));
                     self.pending_effects.extend(new_effects);
                 }
+                Effect::Command { origin, command } => {
+                    // Command effects are executed by the CLI layer.
+                    // Requeue and stop to preserve ordering.
+                    self.pending_effects.push_front(Effect::Command { origin, command });
+                    break;
+                }
             }
         }
         executed
@@ -508,6 +533,14 @@ impl Engine {
             Expr::AbsRef(coords) => {
                 let coord = Coord(coords.clone());
                 self.read_cell_value(tensor, &coord, Value::Int(0))
+            }
+
+            Expr::TensorAbsRef(name, coords) => {
+                let coord = Coord(coords.clone());
+                match self.tensors.get(name) {
+                    Some(target) => self.read_cell_value_current(target, &coord, Value::Empty),
+                    None => Value::Error(format!("Tensor '{}' not found", name)),
+                }
             }
 
             Expr::RelRef(delta) => {
@@ -636,8 +669,94 @@ impl Engine {
                 }
             }
 
+            Expr::CellRange(range) => {
+                let (start_col, start_row) = range.start.indices();
+                let (end_col, end_row) = range.end.indices();
+                let step = range.step.unwrap_or(1);
+                if step <= 0 {
+                    return Value::Array(Vec::new());
+                }
+
+                let (start_col, end_col) = if start_col <= end_col {
+                    (start_col, end_col)
+                } else {
+                    (end_col, start_col)
+                };
+                let (start_row, end_row) = if start_row <= end_row {
+                    (start_row, end_row)
+                } else {
+                    (end_row, start_row)
+                };
+
+                let mut rows = Vec::new();
+                if start_col == end_col || start_row == end_row {
+                    let mut items = Vec::new();
+                    if start_col == end_col {
+                        let mut row = start_row;
+                        while row <= end_row {
+                            let coord2d = Coord(vec![start_col, row]);
+                            let val = self
+                                .map_view_coord_with(view, tensor_name, &coord2d)
+                                .ok()
+                                .map(|nd| self.read_cell_value(tensor, &nd, Value::Empty))
+                                .unwrap_or(Value::Empty);
+                            items.push(val);
+                            row += step;
+                        }
+                    } else {
+                        let mut col = start_col;
+                        while col <= end_col {
+                            let coord2d = Coord(vec![col, start_row]);
+                            let val = self
+                                .map_view_coord_with(view, tensor_name, &coord2d)
+                                .ok()
+                                .map(|nd| self.read_cell_value(tensor, &nd, Value::Empty))
+                                .unwrap_or(Value::Empty);
+                            items.push(val);
+                            col += step;
+                        }
+                    }
+                    Value::Array(items)
+                } else {
+                    let mut row = start_row;
+                    while row <= end_row {
+                        let mut col = start_col;
+                        let mut row_vals = Vec::new();
+                        while col <= end_col {
+                            let coord2d = Coord(vec![col, row]);
+                            let val = self
+                                .map_view_coord_with(view, tensor_name, &coord2d)
+                                .ok()
+                                .map(|nd| self.read_cell_value(tensor, &nd, Value::Empty))
+                                .unwrap_or(Value::Empty);
+                            row_vals.push(val);
+                            col += step;
+                        }
+                        rows.push(Value::Array(row_vals));
+                        row += step;
+                    }
+                    Value::Array(rows)
+                }
+            }
+
+            Expr::Effect(effect) => {
+                match &**effect {
+                    Effect::Tick => Value::Effect(Effect::Tick),
+                    Effect::TickRange(range) => Value::Effect(Effect::TickRange(range.clone())),
+                    Effect::Command { command, .. } => {
+                        let origin = self_coord.map(|c| (tensor_name.to_string(), c.0.clone()));
+                        Value::Effect(Effect::Command {
+                            origin,
+                            command: command.clone(),
+                        })
+                    }
+                }
+            }
+
             Expr::Assign(_, _) => Value::Empty,
+            Expr::AssignRel(_, _) => Value::Empty,
             Expr::AssignAbs(_, _) => Value::Empty,
+            Expr::AssignAll(_, _) => Value::Empty,
             Expr::RangeAssign(_, _) => Value::Empty,
         }
     }
@@ -704,6 +823,17 @@ impl Engine {
         }
         tensor
             .state_prev
+            .get(coord)
+            .cloned()
+            .unwrap_or(default)
+    }
+
+    fn read_cell_value_current(&self, tensor: &Tensor, coord: &Coord, default: Value) -> Value {
+        if let Some(v) = tensor.inputs.get(coord) {
+            return v.clone();
+        }
+        tensor
+            .state_curr
             .get(coord)
             .cloned()
             .unwrap_or(default)

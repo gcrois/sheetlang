@@ -10,6 +10,8 @@ alloc beta [2, 2, 2]
 
 #[0,0,0] = 7
 #[1,0,0] = #[0,0,0] + 3
+// Read from another tensor
+#[0,1,0] = alpha#[0,0,0] + 10
 
 tick
 

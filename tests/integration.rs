@@ -1,7 +1,7 @@
 use chumsky::Parser;
 use logos::Logos;
 use sheetlang::ast::Value;
-use sheetlang::command::{command_parser, CommandResult};
+use sheetlang::command::{command_parser, execute_with_auto_effects, CommandResult};
 use sheetlang::interpreter::{Coord, Engine};
 use sheetlang::lexer::Token;
 use std::fs;
@@ -23,7 +23,11 @@ fn dump_state(engine: &Engine) -> String {
     });
 
     for (coord, val) in sorted_values {
-        out.push_str(&format!("{}: {}\n", coord.to_cell_name(), val));
+        let label = engine
+            .map_view_coord(&coord)
+            .map(|nd| nd.to_string())
+            .unwrap_or_else(|_| coord.to_cell_name());
+        out.push_str(&format!("{}: {}\n", label, val));
     }
     if out.is_empty() {
         return "(empty state)\n".to_string();
@@ -33,13 +37,19 @@ fn dump_state(engine: &Engine) -> String {
 
 fn run_script(engine: &mut Engine, input: &str) -> String {
     let mut output = String::new();
-    output.push_str("--- CODE ---\n");
-    output.push_str(input);
-    output.push_str("\n\n--- EXECUTION ---\n");
+    output.push_str("--- SCRIPT ---\n");
 
     let mut tick_count = 0;
     for line in input.lines() {
         let code_part = line.splitn(2, "//").next().unwrap_or("").trim();
+        let raw_line = line.trim_end();
+        if raw_line.is_empty() {
+            continue;
+        }
+        output.push_str("> ");
+        output.push_str(raw_line);
+        output.push('\n');
+
         if code_part.is_empty() {
             continue;
         }
@@ -58,25 +68,35 @@ fn run_script(engine: &mut Engine, input: &str) -> String {
             }
         };
 
-        match cmd.execute(engine) {
-            CommandResult::Output(text) => {
-                if !text.is_empty() {
-                    output.push_str(&text);
-                    output.push('\n');
-                }
-                if text.contains("Tick processed") {
-                    tick_count += 1;
-                    output.push_str(&format!("\n[Tick {}]\n", tick_count));
-                    output.push_str(&dump_state(engine));
-                }
-            }
-            CommandResult::BShow(_) => {}
-            CommandResult::Demo(_) => {}
-            CommandResult::Exit => {}
-        }
+        let result = execute_with_auto_effects(cmd, engine);
+        append_result(&result, engine, &mut output, &mut tick_count);
     }
 
     output
+}
+
+fn append_result(result: &CommandResult, engine: &Engine, output: &mut String, tick_count: &mut usize) {
+    match result {
+        CommandResult::Output(text) => {
+            if !text.is_empty() {
+                output.push_str(text);
+                output.push('\n');
+            }
+            if text.contains("Tick processed") {
+                *tick_count += 1;
+                output.push_str(&format!("\n[Tick {}]\n", tick_count));
+                output.push_str(&dump_state(engine));
+            }
+        }
+        CommandResult::BShow(_) => {}
+        CommandResult::Demo(_) => {}
+        CommandResult::Exit => {}
+        CommandResult::Batch(results) => {
+            for result in results {
+                append_result(result, engine, output, tick_count);
+            }
+        }
+    }
 }
 
 fn exec_lines(engine: &mut Engine, lines: &[&str]) -> Vec<CommandResult> {
@@ -87,7 +107,7 @@ fn exec_lines(engine: &mut Engine, lines: &[&str]) -> Vec<CommandResult> {
             .map(|(tok, _span)| tok.unwrap_or(Token::Dot));
         let token_stream = chumsky::input::Stream::from_iter(token_iter);
         let cmd = command_parser().parse(token_stream).into_result().unwrap();
-        results.push(cmd.execute(engine));
+        results.push(execute_with_auto_effects(cmd, engine));
     }
     results
 }

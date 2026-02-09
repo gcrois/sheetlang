@@ -1,0 +1,20 @@
+// Virus-style propagation: write the formula once, self-replicate across the row
+alloc virus [5, 1]
+
+// Helper stored off-view (row 2) to keep the virus formula in one place
+#[0,1] = (left) => (left && !@[0,0] && effect { @[1,0] = #[0,1](@[-1,0]) }) || left
+
+#[0,0] = 9
+#[1,0] = #[0,1](@[-1,0])
+
+tick
+tick
+effects run 1
+tick
+effects run 1
+tick
+effects run 1
+tick
+tick
+tick
+show A1:E1

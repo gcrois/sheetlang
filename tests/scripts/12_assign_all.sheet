@@ -1,0 +1,10 @@
+// Assign to every cell in a tensor
+alloc fill [2, 2]
+
+#[*] = 3
+tick
+
+alloc other [2, 1]
+fill#[*] = 5
+use fill
+tick

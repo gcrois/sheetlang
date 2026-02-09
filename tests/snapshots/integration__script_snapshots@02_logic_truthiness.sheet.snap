@@ -1,0 +1,62 @@
+---
+source: tests/integration.rs
+expression: output
+input_file: tests/scripts/02_logic_truthiness.sheet
+---
+--- SCRIPT ---
+> // Logic, comparisons, truthiness with absolute refs
+> alloc logic [6, 4]
+Allocated tensor 'logic'
+> #[0,0] = 10
+Formula set for 1 cell (#[0,0])
+> #[0,1] = #[0,0] > 5
+Formula set for 1 cell (#[0,1])
+> #[0,2] = #[0,0] < 5
+Formula set for 1 cell (#[0,2])
+> #[1,0] = 5 == 5
+Formula set for 1 cell (#[1,0])
+> #[1,1] = 5 != 5
+Formula set for 1 cell (#[1,1])
+> #[2,0] = true && true
+Formula set for 1 cell (#[2,0])
+> #[2,1] = true && false
+Formula set for 1 cell (#[2,1])
+> #[2,2] = false || true
+Formula set for 1 cell (#[2,2])
+> #[3,0] = 1 && 2
+Formula set for 1 cell (#[3,0])
+> #[3,1] = 0 || 5
+Formula set for 1 cell (#[3,1])
+> // Temporal init pattern using absolute self-ref
+> #[4,0] = #[4,0] || 100
+Formula set for 1 cell (#[4,0])
+> tick
+Tick processed.
+
+[Tick 1]
+#[0,0]: 10
+#[1,0]: true
+#[2,0]: true
+#[3,0]: 2
+#[4,0]: 100
+#[0,1]: false
+#[1,1]: false
+#[2,1]: false
+#[3,1]: 5
+#[0,2]: true
+#[2,2]: true
+> tick
+Tick processed.
+
+[Tick 2]
+#[0,0]: 10
+#[1,0]: true
+#[2,0]: true
+#[3,0]: 2
+#[4,0]: 100
+#[0,1]: true
+#[1,1]: false
+#[2,1]: false
+#[3,1]: 5
+#[0,2]: false
+#[2,2]: true

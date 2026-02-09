@@ -1,0 +1,31 @@
+---
+source: tests/integration.rs
+expression: output
+input_file: tests/scripts/07_temporal_propagation.sheet
+---
+--- SCRIPT ---
+> // Temporal propagation (double-buffered) with absolute refs
+> alloc time [3, 3]
+Allocated tensor 'time'
+> #[0,0] = (#[0,0] || 0) + 1
+Formula set for 1 cell (#[0,0])
+> #[1,0] = #[0,0]
+Formula set for 1 cell (#[1,0])
+> tick
+Tick processed.
+
+[Tick 1]
+#[0,0]: 1
+#[1,0]: 0
+> tick
+Tick processed.
+
+[Tick 2]
+#[0,0]: 2
+#[1,0]: 1
+> tick
+Tick processed.
+
+[Tick 3]
+#[0,0]: 3
+#[1,0]: 2

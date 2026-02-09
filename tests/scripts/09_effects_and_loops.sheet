@@ -1,7 +1,20 @@
-// Effects and tick loops with absolute assignment
-alloc effects [2, 2]
+// Effects and tick loops with command effects
+alloc effects_value [3, 1]
 
-#[0,0] = tick()
+// Effect uses spreadsheet value (reads A1 from the new formula)
+#[0,0] = 7
+#[1,0] = effect { #[2,0] = @[-2,0] }
+
+tick
+effects run 1
+tick
+show A1:C1
+effects run 10
+
+alloc effects_tick [2, 1]
+
+// Effect that triggers a tick
+#[0,0] = effect { tick }
 
 tick
 effects pending

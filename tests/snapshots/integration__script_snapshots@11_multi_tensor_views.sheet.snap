@@ -1,0 +1,59 @@
+---
+source: tests/integration.rs
+expression: output
+input_file: tests/scripts/11_multi_tensor_views.sheet
+---
+--- SCRIPT ---
+> // Multiple tensor spaces + view usage
+> alloc alpha [3, 3, 2]
+Allocated tensor 'alpha'
+> #[0,0,0] = 1
+Formula set for 1 cell (#[0,0,0])
+> #[1,0,0] = #[0,0,0] + 1
+Formula set for 1 cell (#[1,0,0])
+> tick
+Tick processed.
+
+[Tick 1]
+#[0,0,0]: 1
+#[1,0,0]: 1
+> alloc beta [2, 2, 2]
+Allocated tensor 'beta'
+> #[0,0,0] = 7
+Formula set for 1 cell (#[0,0,0])
+> #[1,0,0] = #[0,0,0] + 3
+Formula set for 1 cell (#[1,0,0])
+> // Read from another tensor
+> #[0,1,0] = alpha#[0,0,0] + 10
+Formula set for 1 cell (#[0,1,0])
+> tick
+Tick processed.
+
+[Tick 2]
+#[0,0,0]: 7
+#[1,0,0]: 3
+#[0,1,0]: 11
+> use alpha
+Active tensor set to 'alpha'
+> view axes [0,2] offset [0,1,0]
+View axes set to [0, 2]
+View offset set to [0,1,0]
+> #[0,1,0] = 42
+Formula set for 1 cell (#[0,1,0])
+> #[0,1,1] = 100
+Formula set for 1 cell (#[0,1,1])
+> // Use the view (A1) on the RHS to read from the current view
+> #[2,0,0] = A1 + 1
+Formula set for 1 cell (#[2,0,0])
+> tick
+Tick processed.
+
+[Tick 3]
+#[0,1,0]: 42
+#[0,1,1]: 100
+> tick
+Tick processed.
+
+[Tick 4]
+#[0,1,0]: 42
+#[0,1,1]: 100

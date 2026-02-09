@@ -180,23 +180,8 @@ impl Sheet {
         let cmd_parser = crate::command::command_parser();
         let result = match cmd_parser.parse(token_stream).into_result() {
             Ok(cmd) => {
-                match cmd.execute(&mut self.engine) {
-                    crate::command::CommandResult::Output(text) => {
-                        CommandResult::Output { text }
-                    }
-                    crate::command::CommandResult::BShow(coords) => {
-                        let coord_names: Vec<String> = coords.iter()
-                            .map(|c| c.to_cell_name())
-                            .collect();
-                        CommandResult::BShow { coords: coord_names }
-                    }
-                    crate::command::CommandResult::Demo(script) => {
-                        CommandResult::Demo { script }
-                    }
-                    crate::command::CommandResult::Exit => {
-                        CommandResult::Exit
-                    }
-                }
+                let result = crate::command::execute_with_auto_effects(cmd, &mut self.engine);
+                convert_command_result(result)
             }
             Err(errors) => {
                 // Extract detailed error information from the parser
@@ -269,6 +254,7 @@ enum CommandResult {
     BShow { coords: Vec<String> },
     Demo { script: String },
     Exit,
+    Batch { results: Vec<CommandResult> },
     Error {
         message: String,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -276,4 +262,24 @@ enum CommandResult {
         #[serde(skip_serializing_if = "Option::is_none")]
         span_end: Option<usize>,
     },
+}
+
+fn convert_command_result(result: crate::command::CommandResult) -> CommandResult {
+    match result {
+        crate::command::CommandResult::Output(text) => CommandResult::Output { text },
+        crate::command::CommandResult::BShow(coords) => {
+            let coord_names: Vec<String> = coords.iter()
+                .map(|c| c.to_cell_name())
+                .collect();
+            CommandResult::BShow { coords: coord_names }
+        }
+        crate::command::CommandResult::Demo(script) => CommandResult::Demo { script },
+        crate::command::CommandResult::Exit => CommandResult::Exit,
+        crate::command::CommandResult::Batch(results) => {
+            let converted = results.into_iter()
+                .map(convert_command_result)
+                .collect();
+            CommandResult::Batch { results: converted }
+        }
+    }
 }

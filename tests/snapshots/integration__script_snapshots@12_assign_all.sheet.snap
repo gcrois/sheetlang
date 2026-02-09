@@ -1,0 +1,33 @@
+---
+source: tests/integration.rs
+expression: output
+input_file: tests/scripts/12_assign_all.sheet
+---
+--- SCRIPT ---
+> // Assign to every cell in a tensor
+> alloc fill [2, 2]
+Allocated tensor 'fill'
+> #[*] = 3
+Formula set for 4 cells
+> tick
+Tick processed.
+
+[Tick 1]
+#[0,0]: 3
+#[1,0]: 3
+#[0,1]: 3
+#[1,1]: 3
+> alloc other [2, 1]
+Allocated tensor 'other'
+> fill#[*] = 5
+Formula set for 4 cells
+> use fill
+Active tensor set to 'fill'
+> tick
+Tick processed.
+
+[Tick 2]
+#[0,0]: 5
+#[1,0]: 5
+#[0,1]: 5
+#[1,1]: 5

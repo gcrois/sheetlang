@@ -10,3 +10,22 @@ alloc lambdas [6, 4]
 tick
 tick
 tick
+
+// Relative refs at different call sites + captured origin
+#[0,1] = 5
+#[2,1] = 8
+#[4,1] = 20
+#[1,1] = ((origin) => (x) => origin + @[-1,0] + x)(@[-1,0])
+#[3,1] = #[1,1](10)
+#[5,1] = #[1,1](10)
+
+tick
+tick
+tick
+
+// Lambdas that apply effects
+#[0,2] = () => effect { tick }
+#[1,2] = #[0,2]()
+tick
+tick
+effects run 1

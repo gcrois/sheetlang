@@ -1,0 +1,14 @@
+// Assign to every cell in a tensor
+alloc formula [3, 1]
+
+// Game of life logic
+#[0,0] = (n, c) => (((c == 1) && (n == 2 || n == 3)) && 1) || ((n == 3) && 1) || 0
+// Calculate neighbor count
+#[1,0] = () => sum(@[-1:1,-1:1] \ @[0,0])
+// Apply game of life rules
+#[2,0] = () => #[0,0](@[1,0], @[0,0])
+
+alloc other [2, 1]
+fill#[*] = 5
+use fill
+tick

@@ -1,0 +1,103 @@
+---
+source: tests/integration.rs
+expression: output
+input_file: tests/scripts/10_virus.sheet
+---
+--- SCRIPT ---
+> // Virus-style propagation: write the formula once, self-replicate across the row
+> alloc virus [5, 1]
+Allocated tensor 'virus'
+> // Helper stored off-view (row 2) to keep the virus formula in one place
+> #[0,1] = (left) => (left && !@[0,0] && effect { @[1,0] = #[0,1](@[-1,0]) }) || left
+Formula set for 1 cell (#[0,1])
+> #[0,0] = 9
+Formula set for 1 cell (#[0,0])
+> #[1,0] = #[0,1](@[-1,0])
+Formula set for 1 cell (#[1,0])
+> tick
+Tick processed.
+
+[Tick 1]
+#[0,0]: 9
+#[1,0]: empty
+#[0,1]: (left) => (((left && (!@[0,0])) && effect { @[1,0] = #[0,1](@[-1,0]) }) || left)
+> tick
+Tick processed.
+Effects queued: 1
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 2]
+#[0,0]: 9
+#[1,0]: effect { @[1,0] = #[0,1](@[-1,0]) }
+#[0,1]: (left) => (((left && (!@[0,0])) && effect { @[1,0] = #[0,1](@[-1,0]) }) || left)
+> effects run 1
+Formula set for 1 cell (#[2,0])
+Executed 1 effect(s). Pending: 0
+> tick
+Tick processed.
+Effects queued: 1
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 3]
+#[0,0]: 9
+#[1,0]: 9
+#[2,0]: effect { @[1,0] = #[0,1](@[-1,0]) }
+#[0,1]: (left) => (((left && (!@[0,0])) && effect { @[1,0] = #[0,1](@[-1,0]) }) || left)
+> effects run 1
+Formula set for 1 cell (#[3,0])
+Executed 1 effect(s). Pending: 0
+> tick
+Tick processed.
+Effects queued: 1
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 4]
+#[0,0]: 9
+#[1,0]: 9
+#[2,0]: 9
+#[3,0]: effect { @[1,0] = #[0,1](@[-1,0]) }
+#[0,1]: (left) => (((left && (!@[0,0])) && effect { @[1,0] = #[0,1](@[-1,0]) }) || left)
+> effects run 1
+Formula set for 1 cell (#[4,0])
+Executed 1 effect(s). Pending: 0
+> tick
+Tick processed.
+Effects queued: 1
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 5]
+#[0,0]: 9
+#[1,0]: 9
+#[2,0]: 9
+#[3,0]: 9
+#[4,0]: effect { @[1,0] = #[0,1](@[-1,0]) }
+#[0,1]: (left) => (((left && (!@[0,0])) && effect { @[1,0] = #[0,1](@[-1,0]) }) || left)
+> tick
+Tick processed.
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 6]
+#[0,0]: 9
+#[1,0]: 9
+#[2,0]: 9
+#[3,0]: 9
+#[4,0]: 9
+#[0,1]: (left) => (((left && (!@[0,0])) && effect { @[1,0] = #[0,1](@[-1,0]) }) || left)
+> tick
+Tick processed.
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 7]
+#[0,0]: 9
+#[1,0]: 9
+#[2,0]: 9
+#[3,0]: 9
+#[4,0]: 9
+#[0,1]: (left) => (((left && (!@[0,0])) && effect { @[1,0] = #[0,1](@[-1,0]) }) || left)
+> show A1:E1
+Current State (range A1:E1):
+#[0,0]: 9
+#[1,0]: 9
+#[2,0]: 9
+#[3,0]: 9
+#[4,0]: 9
