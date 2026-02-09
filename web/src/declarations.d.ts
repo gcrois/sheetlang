@@ -15,3 +15,9 @@ declare module "*.svg?react" {
 	const Component: React.FC<React.SVGProps<SVGSVGElement>>;
 	export default Component;
 }
+
+declare global {
+    interface Window {
+        __sheetlang_preview_bootstrap__: boolean;
+    }
+}

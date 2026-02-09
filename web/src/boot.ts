@@ -1,6 +1,5 @@
 const PAGES_SUFFIX = ".pages.dev";
 const PROBE_TIMEOUT_MS = 2500;
-const PREVIEW_BOOT_FLAG = "__sheetlang_preview_bootstrap__";
 
 const loadMain = async () => {
     await import("./main.tsx");
@@ -52,11 +51,11 @@ const resolvePagesHost = () => {
 };
 
 const isPreviewBootstrap = () => {
-    return Boolean((window as Record<string, unknown>)[PREVIEW_BOOT_FLAG]);
+    return Boolean(window.__sheetlang_preview_bootstrap__);
 };
 
 const markPreviewBootstrap = () => {
-    (window as Record<string, unknown>)[PREVIEW_BOOT_FLAG] = true;
+    window.__sheetlang_preview_bootstrap__ = true;
 };
 
 const fetchWithTimeout = async (url: string, init: RequestInit = {}) => {
