@@ -1,0 +1,25 @@
+// Multiple tensor spaces + view usage
+alloc alpha [3, 3, 2]
+
+#[0,0,0] = 1
+#[1,0,0] = #[0,0,0] + 1
+
+tick
+
+alloc beta [2, 2, 2]
+
+#[0,0,0] = 7
+#[1,0,0] = #[0,0,0] + 3
+
+tick
+
+use alpha
+view axes [0,2] offset [0,1,0]
+
+#[0,1,0] = 42
+#[0,1,1] = 100
+// Use the view (A1) on the RHS to read from the current view
+#[2,0,0] = A1 + 1
+
+tick
+tick

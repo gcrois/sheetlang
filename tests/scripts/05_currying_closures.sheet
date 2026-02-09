@@ -1,0 +1,12 @@
+// Currying and closures using absolute refs
+alloc lambdas [6, 4]
+
+#[0,0] = (x, y) => x + y
+#[1,0] = #[0,0](10)
+#[2,0] = #[1,0](5)
+
+#[3,0] = ((x) => (y) => x * y)(6)(7)
+
+tick
+tick
+tick

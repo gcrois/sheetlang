@@ -1,0 +1,30 @@
+---
+source: tests/integration.rs
+assertion_line: 111
+expression: output
+input_file: tests/scripts/09_effects_and_loops.sheet
+---
+--- CODE ---
+// Effects and tick loops with absolute assignment
+alloc effects [2, 2]
+
+#[0,0] = tick()
+
+tick
+effects pending
+effects run 1
+effects pending
+
+
+--- EXECUTION ---
+Allocated tensor 'effects'
+Formula set for #[...]
+Tick processed.
+Effects queued: 1
+Pending effects: 1 (use 'effects run' or 'effects auto N')
+
+[Tick 1]
+A1: <effect>
+Pending effects: 1
+Executed 1 effect(s). Pending: 1
+Pending effects: 1

@@ -1,0 +1,73 @@
+---
+source: tests/integration.rs
+assertion_line: 111
+expression: output
+input_file: tests/scripts/02_logic_truthiness.sheet
+---
+--- CODE ---
+// Logic, comparisons, truthiness with absolute refs
+alloc logic [6, 4]
+
+#[0,0] = 10
+
+#[0,1] = #[0,0] > 5
+#[0,2] = #[0,0] < 5
+
+#[1,0] = 5 == 5
+#[1,1] = 5 != 5
+
+#[2,0] = true && true
+#[2,1] = true && false
+#[2,2] = false || true
+
+#[3,0] = 1 && 2
+#[3,1] = 0 || 5
+
+// Temporal init pattern using absolute self-ref
+#[4,0] = #[4,0] || 100
+
+tick
+tick
+
+
+--- EXECUTION ---
+Allocated tensor 'logic'
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Tick processed.
+
+[Tick 1]
+A1: 10
+B1: true
+C1: true
+D1: 2
+E1: 100
+A2: false
+B2: false
+C2: false
+D2: 5
+A3: true
+C3: true
+Tick processed.
+
+[Tick 2]
+A1: 10
+B1: true
+C1: true
+D1: 2
+E1: 100
+A2: true
+B2: false
+C2: false
+D2: 5
+A3: false
+C3: true

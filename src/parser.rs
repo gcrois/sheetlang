@@ -198,12 +198,20 @@ where
             |lhs, (op, rhs)| Expr::Binary(Box::new(lhs), op, Box::new(rhs)),
         );
 
+        let abs_coord = just(Token::Hash)
+            .ignore_then(coord_vec.clone());
+
         let assign = choice((
             // Try range assignment first: "A1:A5 = 10"
             cell_range
                 .then_ignore(just(Token::Eq))
                 .then(logical.clone())
                 .map(|(range, val)| Expr::RangeAssign(range, Box::new(val))),
+            // Absolute assignment: "#[0,0] = 10"
+            abs_coord
+                .then_ignore(just(Token::Eq))
+                .then(logical.clone())
+                .map(|(coords, val)| Expr::AssignAbs(coords, Box::new(val))),
             // Fallback to regular assignment: "A1 = 10"
             select! { Token::Ident(s) => s }
                 .then_ignore(just(Token::Eq))

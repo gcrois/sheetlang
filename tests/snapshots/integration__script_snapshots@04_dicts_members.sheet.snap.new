@@ -1,0 +1,35 @@
+---
+source: tests/integration.rs
+assertion_line: 111
+expression: output
+input_file: tests/scripts/04_dicts_members.sheet
+---
+--- CODE ---
+// Dictionaries and member access using absolute refs
+alloc dicts [4, 4]
+
+#[0,0] = {name: "Ada", age: 36}
+#[1,0] = #[0,0].name
+#[1,1] = #[0,0]["age"]
+
+tick
+tick
+
+
+--- EXECUTION ---
+Allocated tensor 'dicts'
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Tick processed.
+
+[Tick 1]
+A1: { name: "Ada", age: 36 }
+B1: empty
+B2: empty
+Tick processed.
+
+[Tick 2]
+A1: { name: "Ada", age: 36 }
+B1: "Ada"
+B2: 36

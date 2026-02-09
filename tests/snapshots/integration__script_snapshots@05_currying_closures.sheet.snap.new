@@ -1,0 +1,48 @@
+---
+source: tests/integration.rs
+assertion_line: 111
+expression: output
+input_file: tests/scripts/05_currying_closures.sheet
+---
+--- CODE ---
+// Currying and closures using absolute refs
+alloc lambdas [6, 4]
+
+#[0,0] = (x, y) => x + y
+#[1,0] = #[0,0](10)
+#[2,0] = #[1,0](5)
+
+#[3,0] = ((x) => (y) => x * y)(6)(7)
+
+tick
+tick
+tick
+
+
+--- EXECUTION ---
+Allocated tensor 'lambdas'
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Formula set for #[...]
+Tick processed.
+
+[Tick 1]
+A1: <fn>
+B1: empty
+C1: empty
+D1: 42
+Tick processed.
+
+[Tick 2]
+A1: <fn>
+B1: <fn>
+C1: empty
+D1: 42
+Tick processed.
+
+[Tick 3]
+A1: <fn>
+B1: <fn>
+C1: 15
+D1: 42

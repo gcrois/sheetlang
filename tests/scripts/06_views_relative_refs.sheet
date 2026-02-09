@@ -1,0 +1,10 @@
+// View mapping and relative refs inside a 3D tensor (absolute LHS)
+alloc rel [4, 4, 2]
+view axes [0,1] offset [0,0,1]
+
+#[0,0,1] = 10
+#[1,0,1] = @[-1, 0] + 1
+#[2,0,1] = #[0,0,1] + #[1,0,1]
+
+tick
+tick

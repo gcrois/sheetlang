@@ -18,6 +18,7 @@ pub enum Expr {
     Lambda(Vec<String>, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
     Assign(String, Box<Expr>),
+    AssignAbs(Vec<i32>, Box<Expr>),
     RangeAssign(CellRange, Box<Expr>),
 }
 

@@ -1,0 +1,21 @@
+// Excel-style range assignments (view-based) + ambiguity examples
+alloc slice [6, 6]
+
+// Range set values (broadcast scalar)
+A1:C1 = 5
+
+// Range assign array (expands across the range)
+A2:B3 = [1, 2, 3, 4]
+
+// Ambiguity: array value vs expansion
+// Store an array in a single cell
+#[5,0] = [9, 8]
+// Using the array cell in a range assignment broadcasts the array VALUE to each cell
+A4:B4 = #[5,0]
+
+// Relative refs in ranges
+D1:D3 = 2
+E1:E3 = @[-1, 0] * 10
+
+tick
+tick

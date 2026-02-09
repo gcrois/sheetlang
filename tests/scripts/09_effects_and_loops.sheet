@@ -1,0 +1,9 @@
+// Effects and tick loops with absolute assignment
+alloc effects [2, 2]
+
+#[0,0] = tick()
+
+tick
+effects pending
+effects run 1
+effects pending

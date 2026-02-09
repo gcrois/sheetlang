@@ -66,6 +66,7 @@ impl Command {
             Command::Encode => "encode".to_string(),
             Command::Exit => "exit".to_string(),
             Command::Eval(Expr::Assign(_, _)) => "A1 = <expr>".to_string(),
+            Command::Eval(Expr::AssignAbs(_, _)) => "#[i,j] = <expr>".to_string(),
             Command::Eval(Expr::RangeAssign(_, _)) => "A1:C3 = <expr>".to_string(),
             Command::Eval(_) => "<expr>".to_string(),
         }
@@ -89,6 +90,7 @@ impl Command {
             Command::Encode => "Generate shareable URL from command history",
             Command::Exit => "Exit the CLI",
             Command::Eval(Expr::Assign(_, _)) => "Set a formula for a single cell",
+            Command::Eval(Expr::AssignAbs(_, _)) => "Set a formula for a single cell (absolute tensor coord)",
             Command::Eval(Expr::RangeAssign(_, _)) => "Set a formula for a range of cells",
             Command::Eval(_) => "Evaluate an expression",
         }
@@ -109,6 +111,7 @@ impl Command {
             Command::Encode => vec!["encode"],
             Command::Exit => vec!["exit"],
             Command::Eval(Expr::Assign(_, _)) => vec!["A1 = 10", "B1 = A1 + 5"],
+            Command::Eval(Expr::AssignAbs(_, _)) => vec!["#[0,0] = 10", "#[1,0] = #[0,0] + 5"],
             Command::Eval(Expr::RangeAssign(_, _)) => vec!["A1:C3 = 0", "A1:C3 = @[0,0] * 2"],
             Command::Eval(_) => vec![],
         }
@@ -127,6 +130,7 @@ impl Command {
             Command::BShow(None),
             Command::Demo(1),
             Command::Eval(Expr::Assign("A1".to_string(), Box::new(Expr::Literal(crate::ast::Value::Int(0))))),
+            Command::Eval(Expr::AssignAbs(vec![0, 0], Box::new(Expr::Literal(crate::ast::Value::Int(0))))),
             Command::Eval(Expr::RangeAssign(
                 crate::ast::CellRange {
                     start: crate::ast::CellCoord { col: "A".to_string(), row: 1 },
@@ -522,8 +526,8 @@ impl Command {
             }
 
             Command::Demo(n) => {
-                match get_demo_script(n) {
-                    Some(script) => CommandResult::Demo(script.to_string()),
+                match get_demo_script_owned(n) {
+                    Some(script) => CommandResult::Demo(script),
                     None => {
                         CommandResult::Output(format!(
                             "Error: Demo {} not found. Available demos: 1-{}",
@@ -591,6 +595,11 @@ impl Command {
                         } else {
                             format!("Error: Invalid cell reference {}", target)
                         }
+                    }
+                    Expr::AssignAbs(coords, body) => {
+                        let coord = Coord(coords);
+                        engine.set_formula_coord(coord, *body);
+                        "Formula set for #[...]".to_string()
                     }
                     _ => "Expression parsed (use 'A1 = ...' to assign)".to_string(),
                 };
@@ -778,5 +787,9 @@ pub fn build_info_line() -> String {
     out
 }
 
-// Include generated demo scripts code
+// Demo script helpers
 include!(concat!(env!("OUT_DIR"), "/demo_scripts.rs"));
+
+fn get_demo_script_owned(n: u8) -> Option<String> {
+    get_demo_script(n).map(|s| s.to_string())
+}
