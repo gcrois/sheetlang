@@ -20,13 +20,13 @@ Formula set for 1 cell (#[2,0,1])
 Tick processed.
 
 [Tick 1]
-#[0,0,1]: 10
-#[1,0,1]: empty
-#[2,0,1]: 0
+#[0,0,1]: 10 (formula: 10)
+#[1,0,1]: empty (formula: (@[-1,0] + 1))
+#[2,0,1]: 0 (formula: (#[0,0,1] + #[1,0,1]))
 > tick
 Tick processed.
 
 [Tick 2]
-#[0,0,1]: 10
-#[1,0,1]: 11
-#[2,0,1]: empty
+#[0,0,1]: 10 (formula: 10)
+#[1,0,1]: 11 (formula: (@[-1,0] + 1))
+#[2,0,1]: empty (formula: (#[0,0,1] + #[1,0,1]))

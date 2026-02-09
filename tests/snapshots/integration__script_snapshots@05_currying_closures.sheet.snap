@@ -19,26 +19,26 @@ Formula set for 1 cell (#[3,0])
 Tick processed.
 
 [Tick 1]
-#[0,0]: (x, y) => (x + y)
-#[1,0]: empty
-#[2,0]: empty
-#[3,0]: 42
+#[0,0]: (x, y) => (x + y) (formula: (x, y) => (x + y))
+#[1,0]: empty (formula: #[0,0](10))
+#[2,0]: empty (formula: #[1,0](5))
+#[3,0]: 42 (formula: (x) => (y) => (x * y)(6)(7))
 > tick
 Tick processed.
 
 [Tick 2]
-#[0,0]: (x, y) => (x + y)
-#[1,0]: (10, y) => (10 + y)
-#[2,0]: empty
-#[3,0]: 42
+#[0,0]: (x, y) => (x + y) (formula: (x, y) => (x + y))
+#[1,0]: (10, y) => (10 + y) (formula: #[0,0](10))
+#[2,0]: empty (formula: #[1,0](5))
+#[3,0]: 42 (formula: (x) => (y) => (x * y)(6)(7))
 > tick
 Tick processed.
 
 [Tick 3]
-#[0,0]: (x, y) => (x + y)
-#[1,0]: (10, y) => (10 + y)
-#[2,0]: 15
-#[3,0]: 42
+#[0,0]: (x, y) => (x + y) (formula: (x, y) => (x + y))
+#[1,0]: (10, y) => (10 + y) (formula: #[0,0](10))
+#[2,0]: 15 (formula: #[1,0](5))
+#[3,0]: 42 (formula: (x) => (y) => (x * y)(6)(7))
 > // Relative refs at different call sites + captured origin
 > #[0,1] = 5
 Formula set for 1 cell (#[0,1])
@@ -56,44 +56,44 @@ Formula set for 1 cell (#[5,1])
 Tick processed.
 
 [Tick 4]
-#[0,0]: (x, y) => (x + y)
-#[1,0]: (10, y) => (10 + y)
-#[2,0]: 15
-#[3,0]: 42
-#[0,1]: 5
-#[1,1]: (x) => ((empty + @[-1,0]) + x)
-#[2,1]: 8
-#[3,1]: empty
-#[4,1]: 20
-#[5,1]: empty
+#[0,0]: (x, y) => (x + y) (formula: (x, y) => (x + y))
+#[1,0]: (10, y) => (10 + y) (formula: #[0,0](10))
+#[2,0]: 15 (formula: #[1,0](5))
+#[3,0]: 42 (formula: (x) => (y) => (x * y)(6)(7))
+#[0,1]: 5 (formula: 5)
+#[1,1]: (x) => ((empty + @[-1,0]) + x) (formula: (origin) => (x) => ((origin + @[-1,0]) + x)(@[-1,0]))
+#[2,1]: 8 (formula: 8)
+#[3,1]: empty (formula: #[1,1](10))
+#[4,1]: 20 (formula: 20)
+#[5,1]: empty (formula: #[1,1](10))
 > tick
 Tick processed.
 
 [Tick 5]
-#[0,0]: (x, y) => (x + y)
-#[1,0]: (10, y) => (10 + y)
-#[2,0]: 15
-#[3,0]: 42
-#[0,1]: 5
-#[1,1]: (x) => ((5 + @[-1,0]) + x)
-#[2,1]: 8
-#[3,1]: empty
-#[4,1]: 20
-#[5,1]: empty
+#[0,0]: (x, y) => (x + y) (formula: (x, y) => (x + y))
+#[1,0]: (10, y) => (10 + y) (formula: #[0,0](10))
+#[2,0]: 15 (formula: #[1,0](5))
+#[3,0]: 42 (formula: (x) => (y) => (x * y)(6)(7))
+#[0,1]: 5 (formula: 5)
+#[1,1]: (x) => ((5 + @[-1,0]) + x) (formula: (origin) => (x) => ((origin + @[-1,0]) + x)(@[-1,0]))
+#[2,1]: 8 (formula: 8)
+#[3,1]: empty (formula: #[1,1](10))
+#[4,1]: 20 (formula: 20)
+#[5,1]: empty (formula: #[1,1](10))
 > tick
 Tick processed.
 
 [Tick 6]
-#[0,0]: (x, y) => (x + y)
-#[1,0]: (10, y) => (10 + y)
-#[2,0]: 15
-#[3,0]: 42
-#[0,1]: 5
-#[1,1]: (x) => ((5 + @[-1,0]) + x)
-#[2,1]: 8
-#[3,1]: 23
-#[4,1]: 20
-#[5,1]: 35
+#[0,0]: (x, y) => (x + y) (formula: (x, y) => (x + y))
+#[1,0]: (10, y) => (10 + y) (formula: #[0,0](10))
+#[2,0]: 15 (formula: #[1,0](5))
+#[3,0]: 42 (formula: (x) => (y) => (x * y)(6)(7))
+#[0,1]: 5 (formula: 5)
+#[1,1]: (x) => ((5 + @[-1,0]) + x) (formula: (origin) => (x) => ((origin + @[-1,0]) + x)(@[-1,0]))
+#[2,1]: 8 (formula: 8)
+#[3,1]: 23 (formula: #[1,1](10))
+#[4,1]: 20 (formula: 20)
+#[5,1]: 35 (formula: #[1,1](10))
 > // Lambdas that apply effects
 > #[0,2] = () => effect { tick }
 Formula set for 1 cell (#[0,2])
@@ -103,52 +103,52 @@ Formula set for 1 cell (#[1,2])
 Tick processed.
 
 [Tick 7]
-#[0,0]: (x, y) => (x + y)
-#[1,0]: (10, y) => (10 + y)
-#[2,0]: 15
-#[3,0]: 42
-#[0,1]: 5
-#[1,1]: (x) => ((5 + @[-1,0]) + x)
-#[2,1]: 8
-#[3,1]: 23
-#[4,1]: 20
-#[5,1]: 35
-#[0,2]: () => effect { tick }
-#[1,2]: empty
+#[0,0]: (x, y) => (x + y) (formula: (x, y) => (x + y))
+#[1,0]: (10, y) => (10 + y) (formula: #[0,0](10))
+#[2,0]: 15 (formula: #[1,0](5))
+#[3,0]: 42 (formula: (x) => (y) => (x * y)(6)(7))
+#[0,1]: 5 (formula: 5)
+#[1,1]: (x) => ((5 + @[-1,0]) + x) (formula: (origin) => (x) => ((origin + @[-1,0]) + x)(@[-1,0]))
+#[2,1]: 8 (formula: 8)
+#[3,1]: 23 (formula: #[1,1](10))
+#[4,1]: 20 (formula: 20)
+#[5,1]: 35 (formula: #[1,1](10))
+#[0,2]: () => effect { tick } (formula: () => effect { tick })
+#[1,2]: empty (formula: #[0,2]())
 > tick
 Tick processed.
 Effects queued: 1
 Pending effects: 1 (use 'effects run' or 'effects auto N')
 
 [Tick 8]
-#[0,0]: (x, y) => (x + y)
-#[1,0]: (10, y) => (10 + y)
-#[2,0]: 15
-#[3,0]: 42
-#[0,1]: 5
-#[1,1]: (x) => ((5 + @[-1,0]) + x)
-#[2,1]: 8
-#[3,1]: 23
-#[4,1]: 20
-#[5,1]: 35
-#[0,2]: () => effect { tick }
-#[1,2]: effect { tick }
+#[0,0]: (x, y) => (x + y) (formula: (x, y) => (x + y))
+#[1,0]: (10, y) => (10 + y) (formula: #[0,0](10))
+#[2,0]: 15 (formula: #[1,0](5))
+#[3,0]: 42 (formula: (x) => (y) => (x * y)(6)(7))
+#[0,1]: 5 (formula: 5)
+#[1,1]: (x) => ((5 + @[-1,0]) + x) (formula: (origin) => (x) => ((origin + @[-1,0]) + x)(@[-1,0]))
+#[2,1]: 8 (formula: 8)
+#[3,1]: 23 (formula: #[1,1](10))
+#[4,1]: 20 (formula: 20)
+#[5,1]: 35 (formula: #[1,1](10))
+#[0,2]: () => effect { tick } (formula: () => effect { tick })
+#[1,2]: effect { tick } (formula: #[0,2]())
 > effects run 1
 Tick processed.
 Effects queued: 1
 Pending effects: 1 (use 'effects run' or 'effects auto N')
 
 [Tick 9]
-#[0,0]: (x, y) => (x + y)
-#[1,0]: (10, y) => (10 + y)
-#[2,0]: 15
-#[3,0]: 42
-#[0,1]: 5
-#[1,1]: (x) => ((5 + @[-1,0]) + x)
-#[2,1]: 8
-#[3,1]: 23
-#[4,1]: 20
-#[5,1]: 35
-#[0,2]: () => effect { tick }
-#[1,2]: effect { tick }
+#[0,0]: (x, y) => (x + y) (formula: (x, y) => (x + y))
+#[1,0]: (10, y) => (10 + y) (formula: #[0,0](10))
+#[2,0]: 15 (formula: #[1,0](5))
+#[3,0]: 42 (formula: (x) => (y) => (x * y)(6)(7))
+#[0,1]: 5 (formula: 5)
+#[1,1]: (x) => ((5 + @[-1,0]) + x) (formula: (origin) => (x) => ((origin + @[-1,0]) + x)(@[-1,0]))
+#[2,1]: 8 (formula: 8)
+#[3,1]: 23 (formula: #[1,1](10))
+#[4,1]: 20 (formula: 20)
+#[5,1]: 35 (formula: #[1,1](10))
+#[0,2]: () => effect { tick } (formula: () => effect { tick })
+#[1,2]: effect { tick } (formula: #[0,2]())
 Executed 1 effect(s). Pending: 1

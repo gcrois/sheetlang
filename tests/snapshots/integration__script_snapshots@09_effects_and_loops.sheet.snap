@@ -18,8 +18,8 @@ Effects queued: 1
 Pending effects: 1 (use 'effects run' or 'effects auto N')
 
 [Tick 1]
-#[0,0]: 7
-#[1,0]: effect { #[2,0] = @[-2,0] }
+#[0,0]: 7 (formula: 7)
+#[1,0]: effect { #[2,0] = @[-2,0] } (formula: effect { #[2,0] = @[-2,0] })
 > effects run 1
 Formula set for 1 cell (#[2,0])
 Executed 1 effect(s). Pending: 0
@@ -29,14 +29,14 @@ Effects queued: 1
 Pending effects: 1 (use 'effects run' or 'effects auto N')
 
 [Tick 2]
-#[0,0]: 7
-#[1,0]: effect { #[2,0] = @[-2,0] }
-#[2,0]: 7
+#[0,0]: 7 (formula: 7)
+#[1,0]: effect { #[2,0] = @[-2,0] } (formula: effect { #[2,0] = @[-2,0] })
+#[2,0]: 7 (formula: @[-2,0])
 > show A1:C1
 Current State (range A1:C1):
-#[0,0]: 7
-#[1,0]: effect { #[2,0] = @[-2,0] }
-#[2,0]: 7
+#[0,0]: 7 (formula: 7)
+#[1,0]: effect { #[2,0] = @[-2,0] } (formula: effect { #[2,0] = @[-2,0] })
+#[2,0]: 7 (formula: @[-2,0])
 
 > effects run 10
 Formula set for 1 cell (#[2,0])
@@ -52,7 +52,7 @@ Effects queued: 1
 Pending effects: 1 (use 'effects run' or 'effects auto N')
 
 [Tick 3]
-#[0,0]: effect { tick }
+#[0,0]: effect { tick } (formula: effect { tick })
 > effects pending
 Pending effects: 1
 > effects run 1
@@ -61,7 +61,7 @@ Effects queued: 1
 Pending effects: 1 (use 'effects run' or 'effects auto N')
 
 [Tick 4]
-#[0,0]: effect { tick }
+#[0,0]: effect { tick } (formula: effect { tick })
 Executed 1 effect(s). Pending: 1
 > effects pending
 Pending effects: 1

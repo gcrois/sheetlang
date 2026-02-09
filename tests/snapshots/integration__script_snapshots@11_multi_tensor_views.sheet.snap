@@ -15,8 +15,8 @@ Formula set for 1 cell (#[1,0,0])
 Tick processed.
 
 [Tick 1]
-#[0,0,0]: 1
-#[1,0,0]: 1
+#[0,0,0]: 1 (formula: 1)
+#[1,0,0]: 1 (formula: (#[0,0,0] + 1))
 > alloc beta [2, 2, 2]
 Allocated tensor 'beta'
 > #[0,0,0] = 7
@@ -30,9 +30,9 @@ Formula set for 1 cell (#[0,1,0])
 Tick processed.
 
 [Tick 2]
-#[0,0,0]: 7
-#[1,0,0]: 3
-#[0,1,0]: 11
+#[0,0,0]: 7 (formula: 7)
+#[1,0,0]: 3 (formula: (#[0,0,0] + 3))
+#[0,1,0]: 11 (formula: (alpha#[0,0,0] + 10))
 > use alpha
 Active tensor set to 'alpha'
 > view axes [0,2] offset [0,1,0]
@@ -49,11 +49,11 @@ Formula set for 1 cell (#[2,0,0])
 Tick processed.
 
 [Tick 3]
-#[0,1,0]: 42
-#[0,1,1]: 100
+#[0,1,0]: 42 (formula: 42)
+#[0,1,1]: 100 (formula: 100)
 > tick
 Tick processed.
 
 [Tick 4]
-#[0,1,0]: 42
-#[0,1,1]: 100
+#[0,1,0]: 42 (formula: 42)
+#[0,1,1]: 100 (formula: 100)

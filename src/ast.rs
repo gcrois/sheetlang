@@ -8,10 +8,12 @@ pub enum Expr {
     AbsRef(Vec<i32>),
     TensorAbsRef(String, Vec<i32>),
     RelRef(Vec<i32>),
+    RelRange(Vec<IndexSpec>),
     Binary(Box<Expr>, Op, Box<Expr>),
     Unary(Op, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
     Array(Vec<Expr>),
+    Set(Vec<Expr>),
     Dict(Vec<(String, Expr)>),
     Range(Box<Expr>, Box<Expr>),
     CellRange(CellRange),
@@ -22,8 +24,15 @@ pub enum Expr {
     Assign(String, Box<Expr>),
     AssignRel(Vec<i32>, Box<Expr>),
     AssignAbs(Vec<i32>, Box<Expr>),
+    AssignAbsRange(Vec<IndexSpec>, Box<Expr>),
     AssignAll(Option<String>, Box<Expr>),
     RangeAssign(CellRange, Box<Expr>),
+    InputAssign(String, Box<Expr>),
+    InputAssignRel(Vec<i32>, Box<Expr>),
+    InputAssignAbs(Vec<i32>, Box<Expr>),
+    InputAssignAbsRange(Vec<IndexSpec>, Box<Expr>),
+    InputAssignAll(Option<String>, Box<Expr>),
+    InputRangeAssign(CellRange, Box<Expr>),
     Effect(Box<Effect>),
 }
 
@@ -38,6 +47,12 @@ pub struct ViewCapture {
 pub struct CellCoord {
     pub col: String,  // "A", "B", "C", ..., "Z"
     pub row: i32,     // 1-based row number
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum IndexSpec {
+    Single(i32),
+    Range(Option<i32>, Option<i32>),
 }
 
 impl CellCoord {
@@ -101,7 +116,7 @@ pub enum Command {
     Tick(Option<CellRange>),
     Show(Option<CellRange>),
     BShow(Option<CellRange>),
-    Demo(u8),
+    Demo(Option<u8>),
     Help,
     Encode,
     Exit,
@@ -203,6 +218,7 @@ pub enum Op {
     Sub,
     Mul,
     Div,
+    Remove,
     And,
     Or,
     Not,
@@ -210,6 +226,7 @@ pub enum Op {
     Neq,
     Gt,
     Lt,
+    In,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -219,6 +236,7 @@ pub enum Value {
     Bool(bool),
     String(String),
     Array(Vec<Value>),
+    Set(Vec<Value>),
     Dict(Vec<(String, Value)>),
     Range(i64, i64),
     Closure {
@@ -256,6 +274,16 @@ impl fmt::Display for Value {
                     write!(f, "{}", v)?;
                 }
                 write!(f, "]")
+            }
+            Value::Set(items) => {
+                write!(f, "{{ ")?;
+                for (i, v) in items.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", v)?;
+                }
+                write!(f, " }}")
             }
             Value::Dict(d) => {
                 write!(f, "{{ ")?;
@@ -327,6 +355,7 @@ impl fmt::Display for Op {
             Op::Sub => "-",
             Op::Mul => "*",
             Op::Div => "/",
+            Op::Remove => "\\",
             Op::And => "&&",
             Op::Or => "||",
             Op::Not => "!",
@@ -334,6 +363,7 @@ impl fmt::Display for Op {
             Op::Neq => "!=",
             Op::Gt => ">",
             Op::Lt => "<",
+            Op::In => "in",
         };
         write!(f, "{}", s)
     }
@@ -358,6 +388,7 @@ impl fmt::Display for Expr {
             Expr::RelRef(coords) => {
                 write!(f, "@[{}]", coords.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","))
             }
+            Expr::RelRange(specs) => write!(f, "@[{}]", format_index_specs(specs)),
             Expr::Binary(lhs, op, rhs) => write!(f, "({} {} {})", lhs, op, rhs),
             Expr::Unary(op, expr) => write!(f, "({}{})", op, expr),
             Expr::If(cond, then_branch, else_branch) => {
@@ -366,6 +397,10 @@ impl fmt::Display for Expr {
             Expr::Array(items) => {
                 let inner = items.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ");
                 write!(f, "[{}]", inner)
+            }
+            Expr::Set(items) => {
+                let inner = items.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ");
+                write!(f, "{{ {} }}", inner)
             }
             Expr::Dict(items) => {
                 let inner = items
@@ -391,6 +426,9 @@ impl fmt::Display for Expr {
             Expr::AssignAbs(coords, body) => {
                 write!(f, "#[{}] = {}", coords.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","), body)
             }
+            Expr::AssignAbsRange(specs, body) => {
+                write!(f, "#[{}] = {}", format_index_specs(specs), body)
+            }
             Expr::AssignAll(tensor, body) => {
                 if let Some(name) = tensor {
                     write!(f, "{}#[*] = {}", name, body)
@@ -399,9 +437,42 @@ impl fmt::Display for Expr {
                 }
             }
             Expr::RangeAssign(range, body) => write!(f, "{} = {}", range, body),
+            Expr::InputAssign(target, body) => write!(f, "{} := {}", target, body),
+            Expr::InputAssignRel(coords, body) => {
+                write!(f, "@[{}] := {}", coords.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","), body)
+            }
+            Expr::InputAssignAbs(coords, body) => {
+                write!(f, "#[{}] := {}", coords.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","), body)
+            }
+            Expr::InputAssignAbsRange(specs, body) => {
+                write!(f, "#[{}] := {}", format_index_specs(specs), body)
+            }
+            Expr::InputAssignAll(tensor, body) => {
+                if let Some(name) = tensor {
+                    write!(f, "{}#[*] := {}", name, body)
+                } else {
+                    write!(f, "#[*] := {}", body)
+                }
+            }
+            Expr::InputRangeAssign(range, body) => write!(f, "{} := {}", range, body),
             Expr::Effect(effect) => write!(f, "{}", effect),
         }
     }
+}
+
+fn format_index_specs(specs: &[IndexSpec]) -> String {
+    specs
+        .iter()
+        .map(|spec| match spec {
+            IndexSpec::Single(v) => v.to_string(),
+            IndexSpec::Range(start, end) => {
+                let start_str = start.map(|v| v.to_string()).unwrap_or_default();
+                let end_str = end.map(|v| v.to_string()).unwrap_or_default();
+                format!("{}:{}", start_str, end_str)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn format_expr_with_subs(expr: &Expr, subs: &HashMap<String, Value>) -> String {
@@ -436,6 +507,7 @@ fn format_expr_with_subs_inner(
             "@[{}]",
             coords.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(",")
         ),
+        Expr::RelRange(specs) => format!("@[{}]", format_index_specs(specs)),
         Expr::Binary(lhs, op, rhs) => format!(
             "({} {} {})",
             format_expr_with_subs_inner(lhs, subs, shadowed),
@@ -455,6 +527,14 @@ fn format_expr_with_subs_inner(
         ),
         Expr::Array(items) => format!(
             "[{}]",
+            items
+                .iter()
+                .map(|e| format_expr_with_subs_inner(e, subs, shadowed))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Expr::Set(items) => format!(
+            "{{ {} }}",
             items
                 .iter()
                 .map(|e| format_expr_with_subs_inner(e, subs, shadowed))
@@ -520,6 +600,11 @@ fn format_expr_with_subs_inner(
             coords.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","),
             format_expr_with_subs_inner(body, subs, shadowed)
         ),
+        Expr::AssignAbsRange(specs, body) => format!(
+            "#[{}] = {}",
+            format_index_specs(specs),
+            format_expr_with_subs_inner(body, subs, shadowed)
+        ),
         Expr::AssignAll(tensor, body) => {
             let prefix = tensor.as_ref().map(|t| format!("{}#", t)).unwrap_or_else(|| "#".to_string());
             format!(
@@ -530,6 +615,39 @@ fn format_expr_with_subs_inner(
         }
         Expr::RangeAssign(range, body) => format!(
             "{} = {}",
+            range,
+            format_expr_with_subs_inner(body, subs, shadowed)
+        ),
+        Expr::InputAssign(target, body) => format!(
+            "{} := {}",
+            target,
+            format_expr_with_subs_inner(body, subs, shadowed)
+        ),
+        Expr::InputAssignRel(coords, body) => format!(
+            "@[{}] := {}",
+            coords.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","),
+            format_expr_with_subs_inner(body, subs, shadowed)
+        ),
+        Expr::InputAssignAbs(coords, body) => format!(
+            "#[{}] := {}",
+            coords.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","),
+            format_expr_with_subs_inner(body, subs, shadowed)
+        ),
+        Expr::InputAssignAbsRange(specs, body) => format!(
+            "#[{}] := {}",
+            format_index_specs(specs),
+            format_expr_with_subs_inner(body, subs, shadowed)
+        ),
+        Expr::InputAssignAll(tensor, body) => {
+            let prefix = tensor.as_ref().map(|t| format!("{}#", t)).unwrap_or_else(|| "#".to_string());
+            format!(
+                "{}[*] := {}",
+                prefix,
+                format_expr_with_subs_inner(body, subs, shadowed)
+            )
+        }
+        Expr::InputRangeAssign(range, body) => format!(
+            "{} := {}",
             range,
             format_expr_with_subs_inner(body, subs, shadowed)
         ),
@@ -582,7 +700,8 @@ impl fmt::Display for Command {
             Command::Show(None) => write!(f, "show"),
             Command::BShow(Some(range)) => write!(f, "bshow {}", range),
             Command::BShow(None) => write!(f, "bshow"),
-            Command::Demo(n) => write!(f, "demo {}", n),
+            Command::Demo(Some(n)) => write!(f, "demo {}", n),
+            Command::Demo(None) => write!(f, "demo"),
             Command::Help => write!(f, "help"),
             Command::Encode => write!(f, "encode"),
             Command::Exit => write!(f, "exit"),

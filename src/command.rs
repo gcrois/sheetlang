@@ -38,15 +38,22 @@ impl Command {
                     format!("{} [range]", base)
                 }
             }
-            Command::Demo(_) => "demo <number>".to_string(),
+            Command::Demo(_) => "demo [number]".to_string(),
             Command::Help => "help".to_string(),
             Command::Encode => "encode".to_string(),
             Command::Exit => "exit".to_string(),
             Command::Eval(Expr::Assign(_, _)) => "A1 = <expr>".to_string(),
             Command::Eval(Expr::AssignRel(_, _)) => "@[i,j] = <expr>".to_string(),
             Command::Eval(Expr::AssignAbs(_, _)) => "#[i,j] = <expr>".to_string(),
+            Command::Eval(Expr::AssignAbsRange(_, _)) => "#[i:j,k] = <expr>".to_string(),
             Command::Eval(Expr::AssignAll(_, _)) => "#[*] = <expr>".to_string(),
             Command::Eval(Expr::RangeAssign(_, _)) => "A1:C3 = <expr>".to_string(),
+            Command::Eval(Expr::InputAssign(_, _)) => "A1 := <expr>".to_string(),
+            Command::Eval(Expr::InputAssignRel(_, _)) => "@[i,j] := <expr>".to_string(),
+            Command::Eval(Expr::InputAssignAbs(_, _)) => "#[i,j] := <expr>".to_string(),
+            Command::Eval(Expr::InputAssignAbsRange(_, _)) => "#[i:j,k] := <expr>".to_string(),
+            Command::Eval(Expr::InputAssignAll(_, _)) => "#[*] := <expr>".to_string(),
+            Command::Eval(Expr::InputRangeAssign(_, _)) => "A1:C3 := <expr>".to_string(),
             Command::Eval(_) => "<expr>".to_string(),
         }
     }
@@ -64,15 +71,22 @@ impl Command {
             Command::Show(Some(_)) => "Display cell values in range",
             Command::BShow(None) => "Display binary grid visualization (all cells)",
             Command::BShow(Some(_)) => "Display binary grid visualization (range)",
-            Command::Demo(_) => "Load and run a demo script",
+            Command::Demo(_) => "Load and run a demo script, or list demos",
             Command::Help => "Show this help message",
             Command::Encode => "Generate shareable URL from command history",
             Command::Exit => "Exit the CLI",
             Command::Eval(Expr::Assign(_, _)) => "Set a formula for a single cell",
             Command::Eval(Expr::AssignRel(_, _)) => "Set a formula relative to the origin (effects only)",
             Command::Eval(Expr::AssignAbs(_, _)) => "Set a formula for a single cell (absolute tensor coord)",
+            Command::Eval(Expr::AssignAbsRange(_, _)) => "Set a formula for a tensor coord range",
             Command::Eval(Expr::AssignAll(_, _)) => "Set a formula for all cells in a tensor",
             Command::Eval(Expr::RangeAssign(_, _)) => "Set a formula for a range of cells",
+            Command::Eval(Expr::InputAssign(_, _)) => "Set a state value for a single cell (immediate)",
+            Command::Eval(Expr::InputAssignRel(_, _)) => "Set a state value relative to origin (effects only)",
+            Command::Eval(Expr::InputAssignAbs(_, _)) => "Set a state value for a single cell (absolute tensor coord)",
+            Command::Eval(Expr::InputAssignAbsRange(_, _)) => "Set state values for a tensor coord range",
+            Command::Eval(Expr::InputAssignAll(_, _)) => "Set state values for all cells in a tensor",
+            Command::Eval(Expr::InputRangeAssign(_, _)) => "Set state values for a range of cells",
             Command::Eval(_) => "Evaluate an expression",
         }
     }
@@ -87,15 +101,22 @@ impl Command {
             Command::Tick(_) => vec!["tick", "tick A1:C3"],
             Command::Show(_) => vec!["show", "show A1:C3"],
             Command::BShow(_) => vec!["bshow", "bshow A1:C3"],
-            Command::Demo(_) => vec!["demo 1", "demo 9"],
+            Command::Demo(_) => vec!["demo", "demo 1", "demo 9"],
             Command::Help => vec!["help"],
             Command::Encode => vec!["encode"],
             Command::Exit => vec!["exit"],
             Command::Eval(Expr::Assign(_, _)) => vec!["A1 = 10", "B1 = A1 + 5"],
             Command::Eval(Expr::AssignRel(_, _)) => vec!["@[-1,0] = 5"],
             Command::Eval(Expr::AssignAbs(_, _)) => vec!["#[0,0] = 10", "#[1,0] = #[0,0] + 5"],
+            Command::Eval(Expr::AssignAbsRange(_, _)) => vec!["#[0:2,0] = 1"],
             Command::Eval(Expr::AssignAll(_, _)) => vec!["#[*] = 0", "grid#[*] = 1"],
             Command::Eval(Expr::RangeAssign(_, _)) => vec!["A1:C3 = 0", "A1:C3 = @[0,0] * 2"],
+            Command::Eval(Expr::InputAssign(_, _)) => vec!["A1 := 10"],
+            Command::Eval(Expr::InputAssignRel(_, _)) => vec!["@[-1,0] := 5"],
+            Command::Eval(Expr::InputAssignAbs(_, _)) => vec!["#[0,0] := 10"],
+            Command::Eval(Expr::InputAssignAbsRange(_, _)) => vec!["#[0:2,0] := 1"],
+            Command::Eval(Expr::InputAssignAll(_, _)) => vec!["#[*] := 0"],
+            Command::Eval(Expr::InputRangeAssign(_, _)) => vec!["A1:C3 := 0"],
             Command::Eval(_) => vec![],
         }
     }
@@ -111,10 +132,14 @@ impl Command {
             Command::Tick(None),
             Command::Show(None),
             Command::BShow(None),
-            Command::Demo(1),
+            Command::Demo(Some(1)),
             Command::Eval(Expr::Assign("A1".to_string(), Box::new(Expr::Literal(crate::ast::Value::Int(0))))),
             Command::Eval(Expr::AssignRel(vec![0, 0], Box::new(Expr::Literal(crate::ast::Value::Int(0))))),
             Command::Eval(Expr::AssignAbs(vec![0, 0], Box::new(Expr::Literal(crate::ast::Value::Int(0))))),
+            Command::Eval(Expr::AssignAbsRange(
+                vec![crate::ast::IndexSpec::Range(Some(0), Some(1)), crate::ast::IndexSpec::Single(0)],
+                Box::new(Expr::Literal(crate::ast::Value::Int(0)))
+            )),
             Command::Eval(Expr::AssignAll(None, Box::new(Expr::Literal(crate::ast::Value::Int(0))))),
             Command::Eval(Expr::RangeAssign(
                 crate::ast::CellRange {
@@ -124,6 +149,7 @@ impl Command {
                 },
                 Box::new(Expr::Literal(crate::ast::Value::Int(0))),
             )),
+            Command::Eval(Expr::InputAssign("A1".to_string(), Box::new(Expr::Literal(crate::ast::Value::Int(0))))),
             Command::Help,
             Command::Encode,
             Command::Exit,
@@ -348,15 +374,50 @@ impl Command {
             }
 
             Command::Show(range_opt) => {
+                let tensor = match engine.tensors.get(&engine.active) {
+                    Some(t) => t,
+                    None => return CommandResult::Output("Current State (view):\n".to_string()),
+                };
+                let format_line = |label: String,
+                                   val: Value,
+                                   formula: Option<Expr>,
+                                   input: Option<Value>|
+                 -> String {
+                    let mut line = format!("{}: {}", label, val);
+                    let mut meta = Vec::new();
+                    if let Some(expr) = formula {
+                        meta.push(format!("formula: {}", expr));
+                    }
+                    if let Some(value) = input {
+                        meta.push(format!("input: {}", value));
+                    }
+                    if !meta.is_empty() {
+                        line.push_str(&format!(" ({})", meta.join(", ")));
+                    }
+                    line
+                };
                 let output = if let Some(range) = range_opt {
                     let coords: Vec<Coord> = range
                         .expand()
                         .iter()
                         .filter_map(|s| Coord::from_str(s))
                         .collect();
-                    let values = engine.get_values_in_range(&coords);
-                    let mut sorted_values = values.clone();
-                    sorted_values.sort_by(|(a, _), (b, _)| {
+                    let mut entries: Vec<(Coord, Coord, Value, Option<Expr>, Option<Value>)> = Vec::new();
+                    for coord2d in coords {
+                        let nd = match engine.map_view_coord(&coord2d) {
+                            Ok(c) => c,
+                            Err(_) => continue,
+                        };
+                        let val = match tensor.state_curr.get(&nd) {
+                            Some(v) => v.clone(),
+                            None => continue,
+                        };
+                        let formula = tensor.formulas.get(&nd).cloned();
+                        let input = tensor.inputs.get(&nd).cloned();
+                        entries.push((coord2d, nd, val, formula, input));
+                    }
+
+                    entries.sort_by(|(a, _, _, _, _), (b, _, _, _, _)| {
                         let (a_col, a_row) = a.as_2d().unwrap_or((0, 0));
                         let (b_col, b_row) = b.as_2d().unwrap_or((0, 0));
                         let row_cmp = a_row.cmp(&b_row);
@@ -368,19 +429,29 @@ impl Command {
                     });
 
                     let mut out = format!("Current State (range {}:{}):\n", range.start.to_string(), range.end.to_string());
-                    for (coord, val) in sorted_values {
-                        let label = engine
-                            .map_view_coord(&coord)
-                            .map(|nd| nd.to_string())
-                            .unwrap_or_else(|_| coord.to_cell_name());
-                        out.push_str(&format!("{}: {}\n", label, val));
+                    for (_coord2d, nd, val, formula, input) in entries {
+                        let label = nd.to_string();
+                        out.push_str(&format!("{}\n", format_line(label, val, formula, input)));
                     }
                     out
                 } else {
                     let coords = engine.get_all_coords_in_view();
-                    let values = engine.get_values_in_range(&coords);
-                    let mut sorted_values = values.clone();
-                    sorted_values.sort_by(|(a, _), (b, _)| {
+                    let mut entries: Vec<(Coord, Coord, Value, Option<Expr>, Option<Value>)> = Vec::new();
+                    for coord2d in coords {
+                        let nd = match engine.map_view_coord(&coord2d) {
+                            Ok(c) => c,
+                            Err(_) => continue,
+                        };
+                        let val = match tensor.state_curr.get(&nd) {
+                            Some(v) => v.clone(),
+                            None => continue,
+                        };
+                        let formula = tensor.formulas.get(&nd).cloned();
+                        let input = tensor.inputs.get(&nd).cloned();
+                        entries.push((coord2d, nd, val, formula, input));
+                    }
+
+                    entries.sort_by(|(a, _, _, _, _), (b, _, _, _, _)| {
                         let (a_col, a_row) = a.as_2d().unwrap_or((0, 0));
                         let (b_col, b_row) = b.as_2d().unwrap_or((0, 0));
                         let row_cmp = a_row.cmp(&b_row);
@@ -392,12 +463,9 @@ impl Command {
                     });
 
                     let mut out = "Current State (view):\n".to_string();
-                    for (coord, val) in sorted_values {
-                        let label = engine
-                            .map_view_coord(&coord)
-                            .map(|nd| nd.to_string())
-                            .unwrap_or_else(|_| coord.to_cell_name());
-                        out.push_str(&format!("{}: {}\n", label, val));
+                    for (_coord2d, nd, val, formula, input) in entries {
+                        let label = nd.to_string();
+                        out.push_str(&format!("{}\n", format_line(label, val, formula, input)));
                     }
                     out
                 };
@@ -418,18 +486,15 @@ impl Command {
                 CommandResult::BShow(coords)
             }
 
-            Command::Demo(n) => {
-                match get_demo_script_owned(n) {
-                    Some(script) => CommandResult::Demo(script),
-                    None => {
-                        CommandResult::Output(format!(
-                            "Error: Demo {} not found. Available demos: 1-{}",
-                            n,
-                            get_demo_count()
-                        ))
-                    }
-                }
-            }
+            Command::Demo(Some(n)) => match get_demo_script_owned(n) {
+                Some(script) => CommandResult::Demo(script),
+                None => CommandResult::Output(format!(
+                    "Error: Demo {} not found. Available demos: 1-{}",
+                    n,
+                    get_demo_count()
+                )),
+            },
+            Command::Demo(None) => CommandResult::Output(format_demo_list()),
 
             Command::Encode => {
                 CommandResult::Output("Encode command handled by web CLI".to_string())
@@ -510,6 +575,23 @@ impl Command {
                         engine.set_formula_coord(coord, *body);
                         format!("Formula set for 1 cell ({})", coord_label)
                     }
+                    Expr::AssignAbsRange(specs, body) => {
+                        let shape = engine
+                            .tensors
+                            .get(&engine.active)
+                            .map(|t| t.shape.clone())
+                            .unwrap_or_default();
+                        let coords = match expand_coord_spec(&specs, &shape) {
+                            Ok(coords) => coords,
+                            Err(e) => return CommandResult::Output(format!("Error: {}", e)),
+                        };
+                        let mut count = 0;
+                        for coord in coords {
+                            engine.set_formula_coord(coord, (*body).clone());
+                            count += 1;
+                        }
+                        format!("Formula set for {} cells", count)
+                    }
                     Expr::AssignAll(tensor, body) => {
                         let (tensor_name, shape) = if let Some(name) = tensor {
                             match engine.tensors.get(&name) {
@@ -542,6 +624,126 @@ impl Command {
                             }
                         }
                         format!("Formula set for {} cells", count)
+                    }
+                    Expr::InputAssign(target, body) => {
+                        let value = match eval_literal(&body) {
+                            Ok(v) => v,
+                            Err(e) => return CommandResult::Output(format!("Error: {}", e)),
+                        };
+                        if let Some(coord2d) = Coord::from_str(&target) {
+                            let coord = match engine.map_view_coord(&coord2d) {
+                                Ok(c) => c,
+                                Err(e) => return CommandResult::Output(format!("Error: {}", e)),
+                            };
+                            let label = coord.to_string();
+                            engine.set_state_coord(coord, value);
+                            format!("State set for 1 cell ({})", label)
+                        } else {
+                            format!("Error: Invalid cell reference {}", target)
+                        }
+                    }
+                    Expr::InputAssignRel(coords, body) => {
+                        let value = match eval_literal(&body) {
+                            Ok(v) => v,
+                            Err(e) => return CommandResult::Output(format!("Error: {}", e)),
+                        };
+                        let origin = match origin {
+                            Some(coord) => coord,
+                            None => {
+                                return CommandResult::Output(
+                                    "Error: Relative input assignment requires an origin (use inside effect)".to_string(),
+                                )
+                            }
+                        };
+                        let target = origin.offset(&coords);
+                        let label = target.to_string();
+                        engine.set_state_coord(target, value);
+                        format!("State set for 1 cell ({})", label)
+                    }
+                    Expr::InputAssignAbs(coords, body) => {
+                        let value = match eval_literal(&body) {
+                            Ok(v) => v,
+                            Err(e) => return CommandResult::Output(format!("Error: {}", e)),
+                        };
+                        let coord_label = Expr::AbsRef(coords.clone()).to_string();
+                        let coord = Coord(coords);
+                        engine.set_state_coord(coord, value);
+                        format!("State set for 1 cell ({})", coord_label)
+                    }
+                    Expr::InputAssignAbsRange(specs, body) => {
+                        let value = match eval_literal(&body) {
+                            Ok(v) => v,
+                            Err(e) => return CommandResult::Output(format!("Error: {}", e)),
+                        };
+                        let shape = engine
+                            .tensors
+                            .get(&engine.active)
+                            .map(|t| t.shape.clone())
+                            .unwrap_or_default();
+                        let coords = match expand_coord_spec(&specs, &shape) {
+                            Ok(coords) => coords,
+                            Err(e) => return CommandResult::Output(format!("Error: {}", e)),
+                        };
+                        let mut count = 0;
+                        let active = engine.active.clone();
+                        for coord in coords {
+                            if engine.set_state_coord_in(&active, coord, value.clone()).is_ok() {
+                                count += 1;
+                            }
+                        }
+                        format!("State set for {} cells", count)
+                    }
+                    Expr::InputAssignAll(tensor, body) => {
+                        let value = match eval_literal(&body) {
+                            Ok(v) => v,
+                            Err(e) => return CommandResult::Output(format!("Error: {}", e)),
+                        };
+                        let (tensor_name, shape) = if let Some(name) = tensor {
+                            match engine.tensors.get(&name) {
+                                Some(t) => (name.clone(), t.shape.clone()),
+                                None => {
+                                    return CommandResult::Output(format!(
+                                        "Error: Tensor '{}' not found",
+                                        name
+                                    ))
+                                }
+                            }
+                        } else {
+                            let name = engine.active.clone();
+                            let shape = engine
+                                .tensors
+                                .get(&name)
+                                .map(|t| t.shape.clone())
+                                .unwrap_or_default();
+                            (name, shape)
+                        };
+                        let coords = all_coords_for_shape(&shape);
+                        let mut count = 0;
+                        for coord in coords {
+                            if engine.set_state_coord_in(&tensor_name, coord, value.clone()).is_ok() {
+                                count += 1;
+                            }
+                        }
+                        format!("State set for {} cells", count)
+                    }
+                    Expr::InputRangeAssign(range, body) => {
+                        let value = match eval_literal(&body) {
+                            Ok(v) => v,
+                            Err(e) => return CommandResult::Output(format!("Error: {}", e)),
+                        };
+                        let expanded_coords = range.expand();
+                        let mut count = 0;
+                        for cell_name in expanded_coords.iter() {
+                            if let Some(coord2d) = Coord::from_str(cell_name) {
+                                let coord = match engine.map_view_coord(&coord2d) {
+                                    Ok(c) => c,
+                                    Err(_) => continue,
+                                };
+                                engine.set_state_coord(coord, value.clone());
+                                count += 1;
+                            }
+                        }
+                        format!("State set for {} cells", count)
                     }
                     _ => "Expression parsed (use 'A1 = ...' to assign)".to_string(),
                 };
@@ -578,6 +780,13 @@ fn eval_literal(expr: &Expr) -> Result<Value, String> {
                 out.push(eval_literal(item)?);
             }
             Ok(Value::Array(out))
+        }
+        Expr::Set(items) => {
+            let mut out = Vec::new();
+            for item in items {
+                out.push(eval_literal(item)?);
+            }
+            Ok(Value::Set(out))
         }
         Expr::Dict(items) => {
             let mut out = Vec::new();
@@ -662,6 +871,16 @@ fn eval_literal(expr: &Expr) -> Result<Value, String> {
                     }
                 }
                 crate::ast::Op::Not => Ok(Value::Bool(!is_truthy(&l))),
+                crate::ast::Op::Remove => match (l, r) {
+                    (Value::Array(items), rhs) => Ok(Value::Array(items.into_iter().filter(|v| v != &rhs).collect())),
+                    (Value::Set(items), rhs) => Ok(Value::Set(items.into_iter().filter(|v| v != &rhs).collect())),
+                    _ => Err("Invalid types for '\\'".to_string()),
+                },
+                crate::ast::Op::In => match (l, r) {
+                    (item, Value::Set(items)) => Ok(Value::Bool(items.contains(&item))),
+                    (item, Value::Array(items)) => Ok(Value::Bool(items.contains(&item))),
+                    _ => Ok(Value::Bool(false)),
+                },
             }
         }
         _ => Err("Input must be a literal expression".to_string()),
@@ -692,6 +911,64 @@ fn all_coords_for_shape(shape: &[i32]) -> Vec<Coord> {
 
     walk(0, shape, &mut current, &mut coords);
     coords
+}
+
+fn expand_index_spec(
+    spec: &crate::ast::IndexSpec,
+    dim_size: Option<i32>,
+) -> Result<Vec<i32>, String> {
+    match *spec {
+        crate::ast::IndexSpec::Single(v) => Ok(vec![v]),
+        crate::ast::IndexSpec::Range(start, end) => {
+            let start = start.unwrap_or(0);
+            let end = match end {
+                Some(v) => v,
+                None => {
+                    let size = dim_size.ok_or_else(|| {
+                        "Open-ended slices require a tensor shape".to_string()
+                    })?;
+                    if size <= 0 {
+                        return Ok(Vec::new());
+                    }
+                    size - 1
+                }
+            };
+            let (a, b) = if start <= end { (start, end) } else { (end, start) };
+            Ok((a..=b).collect())
+        }
+    }
+}
+
+fn expand_coord_spec(specs: &[crate::ast::IndexSpec], shape: &[i32]) -> Result<Vec<Coord>, String> {
+    if specs.is_empty() {
+        return Ok(vec![Coord(Vec::new())]);
+    }
+    let mut coords = Vec::new();
+    let mut current = Vec::with_capacity(specs.len());
+
+    fn walk(
+        idx: usize,
+        specs: &[crate::ast::IndexSpec],
+        shape: &[i32],
+        current: &mut Vec<i32>,
+        out: &mut Vec<Coord>,
+    ) -> Result<(), String> {
+        if idx == specs.len() {
+            out.push(Coord(current.clone()));
+            return Ok(());
+        }
+        let dim_size = shape.get(idx).cloned();
+        let values = expand_index_spec(&specs[idx], dim_size)?;
+        for v in values {
+            current.push(v);
+            walk(idx + 1, specs, shape, current, out)?;
+            current.pop();
+        }
+        Ok(())
+    }
+
+    walk(0, specs, shape, &mut current, &mut coords)?;
+    Ok(coords)
 }
 
 fn is_truthy(v: &Value) -> bool {
@@ -760,4 +1037,21 @@ include!(concat!(env!("OUT_DIR"), "/demo_scripts.rs"));
 
 fn get_demo_script_owned(n: u8) -> Option<String> {
     get_demo_script(n).map(|s| s.to_string())
+}
+
+fn format_demo_list() -> String {
+    let count = get_demo_count();
+    if count == 0 {
+        return "No demos available.".to_string();
+    }
+
+    let mut out = String::new();
+    out.push_str("Available demos:\n");
+    for n in 1..=count {
+        let raw = get_demo_name(n).unwrap_or("<unknown>");
+        let name = raw.strip_suffix(".sheet").unwrap_or(raw);
+        out.push_str(&format!("  {}: {}\n", n, name));
+    }
+    out.push_str("Run one with: demo <number>");
+    out
 }

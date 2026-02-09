@@ -1,4 +1,4 @@
-use crate::ast::{Effect, Expr, Op, Value, ViewCapture};
+use crate::ast::{Effect, Expr, IndexSpec, Op, Value, ViewCapture};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
@@ -240,6 +240,36 @@ impl Engine {
         }
     }
 
+    pub fn set_input_coord_in(&mut self, tensor_name: &str, coord: Coord, value: Value) -> Result<(), String> {
+        match self.tensors.get_mut(tensor_name) {
+            Some(tensor) => {
+                tensor.inputs.insert(coord, value);
+                Ok(())
+            }
+            None => Err(format!("Tensor '{}' not found", tensor_name)),
+        }
+    }
+
+    pub fn set_state_coord(&mut self, coord: Coord, value: Value) {
+        if let Some(tensor) = self.tensors.get_mut(&self.active) {
+            tensor.inputs.remove(&coord);
+            tensor.state_curr.insert(coord.clone(), value.clone());
+            tensor.state_prev.insert(coord, value);
+        }
+    }
+
+    pub fn set_state_coord_in(&mut self, tensor_name: &str, coord: Coord, value: Value) -> Result<(), String> {
+        match self.tensors.get_mut(tensor_name) {
+            Some(tensor) => {
+                tensor.inputs.remove(&coord);
+                tensor.state_curr.insert(coord.clone(), value.clone());
+                tensor.state_prev.insert(coord, value);
+                Ok(())
+            }
+            None => Err(format!("Tensor '{}' not found", tensor_name)),
+        }
+    }
+
     pub fn clear_input(&mut self, key: &str) -> Result<(), String> {
         let coord2d = Coord::from_str(key).ok_or_else(|| format!("Invalid cell reference {}", key))?;
         let coord = self.map_view_coord_with(&self.view, &self.active, &coord2d)?;
@@ -297,7 +327,14 @@ impl Engine {
             if inputs.contains_key(&coord) {
                 continue;
             }
-            let val = self.eval(&expr, &tensor_name, &self.view, Some(&coord), &HashMap::new());
+            let val = self.eval(
+                &expr,
+                &tensor_name,
+                &self.view,
+                Some(&coord),
+                &HashMap::new(),
+                &tensor_name,
+            );
             next.insert(coord, val);
         }
         for (coord, val) in inputs {
@@ -439,7 +476,14 @@ impl Engine {
             if inputs.contains_key(&coord) {
                 continue;
             }
-            let val = self.eval(&expr, &tensor_name, &self.view, Some(&coord), &HashMap::new());
+            let val = self.eval(
+                &expr,
+                &tensor_name,
+                &self.view,
+                Some(&coord),
+                &HashMap::new(),
+                &tensor_name,
+            );
             if let Value::Effect(effect) = &val {
                 effects.push(effect.clone());
             }
@@ -503,11 +547,13 @@ impl Engine {
         view: &View,
         self_coord: Option<&Coord>,
         locals: &HashMap<String, Value>,
+        relative_tensor_name: &str,
     ) -> Value {
         let tensor = match self.tensors.get(tensor_name) {
             Some(t) => t,
             None => return Value::Error(format!("Tensor '{}' not found", tensor_name)),
         };
+        let relative_tensor = self.tensors.get(relative_tensor_name).unwrap_or(tensor);
 
         match expr {
             Expr::Literal(v) => v.clone(),
@@ -538,7 +584,32 @@ impl Engine {
             Expr::TensorAbsRef(name, coords) => {
                 let coord = Coord(coords.clone());
                 match self.tensors.get(name) {
-                    Some(target) => self.read_cell_value_current(target, &coord, Value::Empty),
+                    Some(target) => {
+                        // Cross-tensor refs should work even if that tensor hasn't been ticked yet.
+                        // If there's no current state value, lazily evaluate the referenced formula.
+                        if let Some(v) = target.inputs.get(&coord) {
+                            return v.clone();
+                        }
+                        if let Some(v) = target.state_curr.get(&coord) {
+                            return v.clone();
+                        }
+                        if let Some(expr) = target.formulas.get(&coord) {
+                            let target_view = if name == tensor_name {
+                                view.clone()
+                            } else {
+                                View::default_for_dims(target.shape.len().max(2))
+                            };
+                            return self.eval(
+                                expr,
+                                name,
+                                &target_view,
+                                Some(&coord),
+                                locals,
+                                relative_tensor_name,
+                            );
+                        }
+                        Value::Empty
+                    }
                     None => Value::Error(format!("Tensor '{}' not found", name)),
                 }
             }
@@ -546,20 +617,49 @@ impl Engine {
             Expr::RelRef(delta) => {
                 if let Some(c) = self_coord {
                     let target = c.offset(delta);
-                    self.read_cell_value(tensor, &target, Value::Empty)
+                    self.read_cell_value(relative_tensor, &target, Value::Empty)
                 } else {
                     Value::Empty
                 }
             }
 
+            Expr::RelRange(specs) => {
+                if let Some(c) = self_coord {
+                    self.eval_rel_range(relative_tensor, c, specs)
+                } else {
+                    Value::Array(Vec::new())
+                }
+            }
+
             Expr::Binary(lhs, op, rhs) => {
-                let l = self.eval(lhs, tensor_name, view, self_coord, locals);
-                let r = self.eval(rhs, tensor_name, view, self_coord, locals);
+                let l = self.eval(
+                    lhs,
+                    tensor_name,
+                    view,
+                    self_coord,
+                    locals,
+                    relative_tensor_name,
+                );
+                let r = self.eval(
+                    rhs,
+                    tensor_name,
+                    view,
+                    self_coord,
+                    locals,
+                    relative_tensor_name,
+                );
                 self.apply_op(op, l, r)
             }
 
             Expr::Unary(op, expr) => {
-                let val = self.eval(expr, tensor_name, view, self_coord, locals);
+                let val = self.eval(
+                    expr,
+                    tensor_name,
+                    view,
+                    self_coord,
+                    locals,
+                    relative_tensor_name,
+                );
                 match op {
                     Op::Not => Value::Bool(!self.is_truthy(&val)),
                     Op::Sub => {
@@ -574,11 +674,32 @@ impl Engine {
             }
 
             Expr::If(cond, then_branch, else_branch) => {
-                let c = self.eval(cond, tensor_name, view, self_coord, locals);
+                let c = self.eval(
+                    cond,
+                    tensor_name,
+                    view,
+                    self_coord,
+                    locals,
+                    relative_tensor_name,
+                );
                 if self.is_truthy(&c) {
-                    self.eval(then_branch, tensor_name, view, self_coord, locals)
+                    self.eval(
+                        then_branch,
+                        tensor_name,
+                        view,
+                        self_coord,
+                        locals,
+                        relative_tensor_name,
+                    )
                 } else {
-                    self.eval(else_branch, tensor_name, view, self_coord, locals)
+                    self.eval(
+                        else_branch,
+                        tensor_name,
+                        view,
+                        self_coord,
+                        locals,
+                        relative_tensor_name,
+                    )
                 }
             }
 
@@ -596,37 +717,81 @@ impl Engine {
                     if name == "tick" && arg_exprs.is_empty() {
                         return Value::Effect(Effect::Tick);
                     }
+                    if name == "sum" && !arg_exprs.is_empty() {
+                        let arg_val = self.eval(
+                            &arg_exprs[0],
+                            tensor_name,
+                            view,
+                            self_coord,
+                            locals,
+                            relative_tensor_name,
+                        );
+                        return Value::Int(self.sum_value(&arg_val));
+                    }
+                    if name == "flat" && !arg_exprs.is_empty() {
+                        let arg_val = self.eval(
+                            &arg_exprs[0],
+                            tensor_name,
+                            view,
+                            self_coord,
+                            locals,
+                            relative_tensor_name,
+                        );
+                        return Value::Array(self.flatten_value(&arg_val));
+                    }
                 }
 
-                let func = self.eval(func_expr, tensor_name, view, self_coord, locals);
+                let func = self.eval(
+                    func_expr,
+                    tensor_name,
+                    view,
+                    self_coord,
+                    locals,
+                    relative_tensor_name,
+                );
                 let mut arg_vals = Vec::new();
                 for a in arg_exprs {
-                    arg_vals.push(self.eval(a, tensor_name, view, self_coord, locals));
+                    arg_vals.push(self.eval(
+                        a,
+                        tensor_name,
+                        view,
+                        self_coord,
+                        locals,
+                        relative_tensor_name,
+                    ));
                 }
 
-                self.apply_call(func, arg_vals, tensor_name, self_coord)
+                self.apply_call(func, arg_vals, self_coord, relative_tensor_name)
             }
 
             Expr::Array(items) => {
                 let v = items
                     .iter()
-                    .map(|e| self.eval(e, tensor_name, view, self_coord, locals))
+                    .map(|e| self.eval(e, tensor_name, view, self_coord, locals, relative_tensor_name))
                     .collect();
                 Value::Array(v)
+            }
+
+            Expr::Set(items) => {
+                let v = items
+                    .iter()
+                    .map(|e| self.eval(e, tensor_name, view, self_coord, locals, relative_tensor_name))
+                    .collect();
+                Value::Set(v)
             }
 
             Expr::Dict(items) => {
                 let mut d = Vec::new();
                 for (k, v_expr) in items {
-                    let v = self.eval(v_expr, tensor_name, view, self_coord, locals);
+                    let v = self.eval(v_expr, tensor_name, view, self_coord, locals, relative_tensor_name);
                     d.push((k.clone(), v));
                 }
                 Value::Dict(d)
             }
 
             Expr::Range(start, end) => {
-                let s = self.eval(start, tensor_name, view, self_coord, locals);
-                let e = self.eval(end, tensor_name, view, self_coord, locals);
+                let s = self.eval(start, tensor_name, view, self_coord, locals, relative_tensor_name);
+                let e = self.eval(end, tensor_name, view, self_coord, locals, relative_tensor_name);
                 if let (Value::Int(s_val), Value::Int(e_val)) = (s, e) {
                     Value::Range(s_val, e_val)
                 } else {
@@ -635,7 +800,7 @@ impl Engine {
             }
 
             Expr::Member(obj_expr, key) => {
-                let obj = self.eval(obj_expr, tensor_name, view, self_coord, locals);
+                let obj = self.eval(obj_expr, tensor_name, view, self_coord, locals, relative_tensor_name);
                 if let Value::Dict(pairs) = obj {
                     for (k, v) in pairs {
                         if k == *key {
@@ -647,8 +812,8 @@ impl Engine {
             }
 
             Expr::Index(obj_expr, idx_expr) => {
-                let obj = self.eval(obj_expr, tensor_name, view, self_coord, locals);
-                let idx = self.eval(idx_expr, tensor_name, view, self_coord, locals);
+                let obj = self.eval(obj_expr, tensor_name, view, self_coord, locals, relative_tensor_name);
+                let idx = self.eval(idx_expr, tensor_name, view, self_coord, locals, relative_tensor_name);
                 match (obj, idx) {
                     (Value::Array(arr), Value::Int(i)) => {
                         if i >= 0 && (i as usize) < arr.len() {
@@ -756,8 +921,15 @@ impl Engine {
             Expr::Assign(_, _) => Value::Empty,
             Expr::AssignRel(_, _) => Value::Empty,
             Expr::AssignAbs(_, _) => Value::Empty,
+            Expr::AssignAbsRange(_, _) => Value::Empty,
             Expr::AssignAll(_, _) => Value::Empty,
             Expr::RangeAssign(_, _) => Value::Empty,
+            Expr::InputAssign(_, _) => Value::Empty,
+            Expr::InputAssignRel(_, _) => Value::Empty,
+            Expr::InputAssignAbs(_, _) => Value::Empty,
+            Expr::InputAssignAbsRange(_, _) => Value::Empty,
+            Expr::InputAssignAll(_, _) => Value::Empty,
+            Expr::InputRangeAssign(_, _) => Value::Empty,
         }
     }
 
@@ -765,8 +937,8 @@ impl Engine {
         &self,
         func: Value,
         args: Vec<Value>,
-        caller_tensor: &str,
         self_coord: Option<&Coord>,
+        relative_tensor_name: &str,
     ) -> Value {
         match func {
             Value::Closure {
@@ -798,17 +970,18 @@ impl Engine {
                     }
                 }
 
-                let use_self_coord = if tensor == caller_tensor {
-                    self_coord
-                } else {
-                    None
-                };
-
-                let result = self.eval(&body, &tensor, &view, use_self_coord, &new_locals);
+                let result = self.eval(
+                    &body,
+                    &tensor,
+                    &view,
+                    self_coord,
+                    &new_locals,
+                    relative_tensor_name,
+                );
 
                 if all_args.len() > params.len() {
                     let rest = all_args[params.len()..].to_vec();
-                    return self.apply_call(result, rest, caller_tensor, self_coord);
+                    return self.apply_call(result, rest, self_coord, relative_tensor_name);
                 }
 
                 result
@@ -828,15 +1001,86 @@ impl Engine {
             .unwrap_or(default)
     }
 
-    fn read_cell_value_current(&self, tensor: &Tensor, coord: &Coord, default: Value) -> Value {
-        if let Some(v) = tensor.inputs.get(coord) {
-            return v.clone();
+    fn eval_rel_range(&self, tensor: &Tensor, self_coord: &Coord, specs: &[IndexSpec]) -> Value {
+        if specs.is_empty() {
+            return Value::Array(Vec::new());
         }
-        tensor
-            .state_curr
-            .get(coord)
-            .cloned()
-            .unwrap_or(default)
+        let mut base = self_coord.0.clone();
+        if base.len() < specs.len() {
+            base.resize(specs.len(), 0);
+        }
+
+        fn expand(spec: &IndexSpec) -> Vec<i32> {
+            match *spec {
+                IndexSpec::Single(v) => vec![v],
+                IndexSpec::Range(a, b) => {
+                    let start = a.unwrap_or(0);
+                    let end = b.unwrap_or(0);
+                    if start <= end {
+                        (start..=end).collect()
+                    } else {
+                        (end..=start).collect()
+                    }
+                }
+            }
+        }
+
+        fn walk(
+            engine: &Engine,
+            tensor: &Tensor,
+            specs: &[IndexSpec],
+            base: &Vec<i32>,
+            dim: usize,
+        ) -> Value {
+            let offsets = expand(&specs[dim]);
+            let mut out = Vec::new();
+            for off in offsets {
+                let mut coord = base.clone();
+                if coord.len() <= dim {
+                    coord.resize(dim + 1, 0);
+                }
+                coord[dim] = coord[dim] + off;
+                if dim + 1 == specs.len() {
+                    let val = engine.read_cell_value(tensor, &Coord(coord), Value::Empty);
+                    out.push(val);
+                } else {
+                    out.push(walk(engine, tensor, specs, &coord, dim + 1));
+                }
+            }
+            Value::Array(out)
+        }
+
+        walk(self, tensor, specs, &base, 0)
+    }
+
+    fn flatten_value(&self, value: &Value) -> Vec<Value> {
+        match value {
+            Value::Array(items) => {
+                let mut out = Vec::new();
+                for item in items {
+                    out.extend(self.flatten_value(item));
+                }
+                out
+            }
+            Value::Set(items) => {
+                let mut out = Vec::new();
+                for item in items {
+                    out.extend(self.flatten_value(item));
+                }
+                out
+            }
+            _ => vec![value.clone()],
+        }
+    }
+
+    fn sum_value(&self, value: &Value) -> i64 {
+        match value {
+            Value::Int(n) => *n,
+            Value::Bool(b) => if *b { 1 } else { 0 },
+            Value::Array(items) => items.iter().map(|v| self.sum_value(v)).sum(),
+            Value::Set(items) => items.iter().map(|v| self.sum_value(v)).sum(),
+            _ => 0,
+        }
     }
 
     fn apply_op(&self, op: &Op, l: Value, r: Value) -> Value {
@@ -871,6 +1115,13 @@ impl Engine {
                 (Value::Empty, _) | (_, Value::Empty) => Value::Empty,
                 _ => Value::Error("Invalid types for Div".into()),
             },
+            (Op::Remove, Value::Array(items), rhs) => {
+                Value::Array(items.into_iter().filter(|v| v != &rhs).collect())
+            }
+            (Op::Remove, Value::Set(items), rhs) => {
+                Value::Set(items.into_iter().filter(|v| v != &rhs).collect())
+            }
+            (Op::Remove, _, _) => Value::Error("Invalid types for Remove".into()),
 
             (Op::Eq, a, b) => Value::Bool(a == b),
             (Op::Neq, a, b) => Value::Bool(a != b),
@@ -886,6 +1137,9 @@ impl Engine {
                 (Value::String(a), Value::String(b)) => Value::Bool(a < b),
                 _ => Value::Bool(false),
             },
+            (Op::In, item, Value::Set(items)) => Value::Bool(items.contains(&item)),
+            (Op::In, item, Value::Array(items)) => Value::Bool(items.contains(&item)),
+            (Op::In, _, _) => Value::Bool(false),
 
             (Op::And, l, r) => {
                 if self.is_truthy(&l) {

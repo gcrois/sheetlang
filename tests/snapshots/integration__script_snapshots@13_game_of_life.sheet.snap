@@ -1,0 +1,70 @@
+---
+source: tests/integration.rs
+expression: output
+input_file: tests/scripts/13_game_of_life.sheet
+---
+--- SCRIPT ---
+> // basic game of life
+> alloc formula [3, 1]
+Allocated tensor 'formula'
+> // Game of life logic
+> #[0,0] = (n, c) => if (c == 1 && n in {2, 3}) then 1 else if (c == 0 && n == 3) then 1 else 0
+Formula set for 1 cell (#[0,0])
+> // Gather neighbor count from relative refs at the final call site
+> #[1,0] = () => sum(flat(@[-1:1,-1:1])) - @[0,0]
+Formula set for 1 cell (#[1,0])
+> // Combine and apply logic
+> #[2,0] = () => formula#[0,0](formula#[1,0](), @[0,0])
+Formula set for 1 cell (#[2,0])
+> alloc board [3, 3]
+Allocated tensor 'board'
+> // immediately set state of the board to init
+> #[*] := 0
+State set for 9 cells
+> // create blinker pattern
+> #[:, 1] := 1
+State set for 3 cells
+> // Set formula for the board to apply game of life rules
+> #[*] = formula#[2,0]()
+Formula set for 9 cells
+> tick
+Tick processed.
+
+[Tick 1]
+#[0,0]: 0 (formula: formula#[2,0]())
+#[1,0]: 1 (formula: formula#[2,0]())
+#[2,0]: 0 (formula: formula#[2,0]())
+#[0,1]: 0 (formula: formula#[2,0]())
+#[1,1]: 1 (formula: formula#[2,0]())
+#[2,1]: 0 (formula: formula#[2,0]())
+#[0,2]: 0 (formula: formula#[2,0]())
+#[1,2]: 1 (formula: formula#[2,0]())
+#[2,2]: 0 (formula: formula#[2,0]())
+> // should flip
+> tick
+Tick processed.
+
+[Tick 2]
+#[0,0]: 0 (formula: formula#[2,0]())
+#[1,0]: 0 (formula: formula#[2,0]())
+#[2,0]: 0 (formula: formula#[2,0]())
+#[0,1]: 1 (formula: formula#[2,0]())
+#[1,1]: 1 (formula: formula#[2,0]())
+#[2,1]: 1 (formula: formula#[2,0]())
+#[0,2]: 0 (formula: formula#[2,0]())
+#[1,2]: 0 (formula: formula#[2,0]())
+#[2,2]: 0 (formula: formula#[2,0]())
+> // should flip back
+> tick
+Tick processed.
+
+[Tick 3]
+#[0,0]: 0 (formula: formula#[2,0]())
+#[1,0]: 1 (formula: formula#[2,0]())
+#[2,0]: 0 (formula: formula#[2,0]())
+#[0,1]: 0 (formula: formula#[2,0]())
+#[1,1]: 1 (formula: formula#[2,0]())
+#[2,1]: 0 (formula: formula#[2,0]())
+#[0,2]: 0 (formula: formula#[2,0]())
+#[1,2]: 1 (formula: formula#[2,0]())
+#[2,2]: 0 (formula: formula#[2,0]())

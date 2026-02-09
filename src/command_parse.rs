@@ -159,11 +159,11 @@ where
         .to(Command::Encode)
         .boxed();
 
-    // demo <n>
+    // demo [n]
     let demo_cmd = ident
         .clone()
         .filter(|s| s == "demo")
-        .ignore_then(select! { Token::Int(n) => n as u8 })
+        .ignore_then(select! { Token::Int(n) => n as u8 }.or_not())
         .map(Command::Demo)
         .boxed();
 

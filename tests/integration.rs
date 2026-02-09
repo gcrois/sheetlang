@@ -9,9 +9,26 @@ use std::fs;
 fn dump_state(engine: &Engine) -> String {
     let mut out = String::new();
     let coords = engine.get_all_coords_in_view();
-    let values = engine.get_values_in_range(&coords);
-    let mut sorted_values = values.clone();
-    sorted_values.sort_by(|(a, _), (b, _)| {
+    let tensor = match engine.tensors.get(&engine.active) {
+        Some(t) => t,
+        None => return "(empty state)\n".to_string(),
+    };
+    let mut entries: Vec<(Coord, Coord, Value, Option<sheetlang::ast::Expr>, Option<Value>)> = Vec::new();
+    for coord2d in coords {
+        let nd = match engine.map_view_coord(&coord2d) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let val = match tensor.state_curr.get(&nd) {
+            Some(v) => v.clone(),
+            None => continue,
+        };
+        let formula = tensor.formulas.get(&nd).cloned();
+        let input = tensor.inputs.get(&nd).cloned();
+        entries.push((coord2d, nd, val, formula, input));
+    }
+
+    entries.sort_by(|(a, _, _, _, _), (b, _, _, _, _)| {
         let (a_col, a_row) = a.as_2d().unwrap_or((0, 0));
         let (b_col, b_row) = b.as_2d().unwrap_or((0, 0));
         let row_cmp = a_row.cmp(&b_row);
@@ -22,12 +39,21 @@ fn dump_state(engine: &Engine) -> String {
         }
     });
 
-    for (coord, val) in sorted_values {
-        let label = engine
-            .map_view_coord(&coord)
-            .map(|nd| nd.to_string())
-            .unwrap_or_else(|_| coord.to_cell_name());
-        out.push_str(&format!("{}: {}\n", label, val));
+    for (_coord2d, nd, val, formula, input) in entries {
+        let label = nd.to_string();
+        let mut line = format!("{}: {}", label, val);
+        let mut meta = Vec::new();
+        if let Some(expr) = formula {
+            meta.push(format!("formula: {}", expr));
+        }
+        if let Some(value) = input {
+            meta.push(format!("input: {}", value));
+        }
+        if !meta.is_empty() {
+            line.push_str(&format!(" ({})", meta.join(", ")));
+        }
+        out.push_str(&line);
+        out.push('\n');
     }
     if out.is_empty() {
         return "(empty state)\n".to_string();

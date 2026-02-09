@@ -1,5 +1,5 @@
 use wasm_bindgen::prelude::*;
-use crate::interpreter::Engine;
+use crate::interpreter::{Coord, Engine};
 use crate::parser::parser;
 use crate::lexer::Token;
 use chumsky::Parser;

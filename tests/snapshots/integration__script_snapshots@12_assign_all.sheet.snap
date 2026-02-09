@@ -13,10 +13,10 @@ Formula set for 4 cells
 Tick processed.
 
 [Tick 1]
-#[0,0]: 3
-#[1,0]: 3
-#[0,1]: 3
-#[1,1]: 3
+#[0,0]: 3 (formula: 3)
+#[1,0]: 3 (formula: 3)
+#[0,1]: 3 (formula: 3)
+#[1,1]: 3 (formula: 3)
 > alloc other [2, 1]
 Allocated tensor 'other'
 > fill#[*] = 5
@@ -27,7 +27,7 @@ Active tensor set to 'fill'
 Tick processed.
 
 [Tick 2]
-#[0,0]: 5
-#[1,0]: 5
-#[0,1]: 5
-#[1,1]: 5
+#[0,0]: 5 (formula: 5)
+#[1,0]: 5 (formula: 5)
+#[0,1]: 5 (formula: 5)
+#[1,1]: 5 (formula: 5)

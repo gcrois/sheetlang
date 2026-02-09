@@ -47,6 +47,8 @@ pub enum Token {
     RBrace,
     #[token(",")]
     Comma,
+    #[token(":=")]
+    ColonEq,
     #[token(":")]
     Colon,
     #[token("=")]
@@ -61,6 +63,8 @@ pub enum Token {
     At, // For relative refs
     #[token("..")]
     DotDot, // For ranges
+    #[token("\\")]
+    Backslash,
 
     // Data
     #[regex("[0-9]+", |lex| lex.slice().parse::<i64>().unwrap())]

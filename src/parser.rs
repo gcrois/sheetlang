@@ -1,4 +1,4 @@
-use crate::ast::{CellCoord, CellRange, Effect, Expr, Op, Value};
+use crate::ast::{CellCoord, CellRange, Effect, Expr, IndexSpec, Op, Value};
 use crate::command_parse::command_parser_with_expr;
 use crate::lexer::Token;
 use chumsky::prelude::*;
@@ -22,6 +22,12 @@ enum PostfixOp {
     Call(Vec<Expr>),
     Index(Expr),
     Member(String),
+}
+
+#[derive(Clone)]
+enum BraceEntry {
+    Dict(String, Expr),
+    Set(Expr),
 }
 
 pub fn parser<'src, I>() -> Boxed<'src, 'src, I, Expr, extra::Err<Rich<'src, Token>>>
@@ -77,7 +83,35 @@ where
             })
             .boxed();
 
+        let open_range = just(Token::Colon)
+            .ignore_then(signed_int.clone().or_not())
+            .map(|end| IndexSpec::Range(None, end))
+            .boxed();
+
+        let index_spec = choice((
+            open_range,
+            signed_int
+                .clone()
+                .then(
+                    just(Token::Colon)
+                        .ignore_then(signed_int.clone().or_not())
+                        .or_not(),
+                )
+                .map(|(start, tail)| match tail {
+                    None => IndexSpec::Single(start),
+                    Some(end) => IndexSpec::Range(Some(start), end),
+                }),
+        ))
+        .boxed();
+
         let coord_vec = signed_int
+            .separated_by(just(Token::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LBracket), just(Token::RBracket))
+            .boxed();
+
+        let coord_spec = index_spec
             .separated_by(just(Token::Comma))
             .allow_trailing()
             .collect::<Vec<_>>()
@@ -97,10 +131,27 @@ where
             .map(|(name, coords)| Expr::TensorAbsRef(name, coords))
             .boxed();
 
-        // Relative Ref: @[dx, dy, ...]
+        // Relative Ref or range: @[dx, dy, ...] or @[-1:1,-1:1]
         let rel_ref = just(Token::At)
-            .ignore_then(coord_vec.clone())
-            .map(Expr::RelRef)
+            .ignore_then(coord_spec.clone())
+            .try_map(|specs, span| {
+                if specs.iter().any(|s| matches!(s, IndexSpec::Range(None, _) | IndexSpec::Range(_, None))) {
+                    return Err(Rich::custom(span, "Relative ranges require explicit start and end"));
+                }
+                let all_single = specs.iter().all(|s| matches!(s, IndexSpec::Single(_)));
+                if all_single {
+                    let coords = specs
+                        .iter()
+                        .map(|s| match s {
+                            IndexSpec::Single(v) => *v,
+                            IndexSpec::Range(_, _) => 0,
+                        })
+                        .collect::<Vec<_>>();
+                    Ok(Expr::RelRef(coords))
+                } else {
+                    Ok(Expr::RelRange(specs))
+                }
+            })
             .boxed();
 
         let array = expr
@@ -112,17 +163,43 @@ where
             .map(Expr::Array)
             .boxed();
 
-        let dict_entry = select! { Token::Ident(k) => k }
+        let brace_entry = select! { Token::Ident(k) => k }
             .then_ignore(just(Token::Colon))
             .then(expr.clone())
+            .map(|(k, v)| BraceEntry::Dict(k, v))
+            .or(expr.clone().map(BraceEntry::Set))
             .boxed();
 
-        let dict = dict_entry
+        let brace_literal = brace_entry
             .separated_by(just(Token::Comma))
             .allow_trailing()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace))
-            .map(Expr::Dict)
+            .try_map(|entries, span| {
+                let mut dict_items = Vec::new();
+                let mut set_items = Vec::new();
+                let mut has_dict = false;
+                let mut has_set = false;
+                for entry in entries {
+                    match entry {
+                        BraceEntry::Dict(k, v) => {
+                            has_dict = true;
+                            dict_items.push((k, v));
+                        }
+                        BraceEntry::Set(v) => {
+                            has_set = true;
+                            set_items.push(v);
+                        }
+                    }
+                }
+                if has_dict && has_set {
+                    Err(Rich::custom(span, "Cannot mix set and dict literals"))
+                } else if has_dict {
+                    Ok(Expr::Dict(dict_items))
+                } else {
+                    Ok(Expr::Set(set_items))
+                }
+            })
             .boxed();
 
         let grouping = expr
@@ -164,7 +241,7 @@ where
             effect_cmd,
             val,
             array,
-            dict,
+            brace_literal,
             grouping,
         ))
         .boxed();
@@ -219,6 +296,7 @@ where
             choice((
                 just(Token::Plus).to(Op::Add),
                 just(Token::Minus).to(Op::Sub),
+                just(Token::Backslash).to(Op::Remove),
             ))
             .then(product)
             .repeated(),
@@ -239,6 +317,7 @@ where
                 just(Token::NotEq).to(Op::Neq),
                 just(Token::Gt).to(Op::Gt),
                 just(Token::Lt).to(Op::Lt),
+                select! { Token::Ident(s) if s == "in" => () }.to(Op::In),
             ))
             .then(range)
             .repeated(),
@@ -254,8 +333,21 @@ where
         )
         .boxed();
 
-        let abs_coord = just(Token::Hash)
-            .ignore_then(coord_vec.clone())
+        let if_expr = select! { Token::Ident(s) if s == "if" => () }
+            .ignore_then(expr.clone())
+            .then_ignore(select! { Token::Ident(s) if s == "then" => () })
+            .then(expr.clone())
+            .then_ignore(select! { Token::Ident(s) if s == "else" => () })
+            .then(expr.clone())
+            .map(|((cond, then_branch), else_branch)| {
+                Expr::If(Box::new(cond), Box::new(then_branch), Box::new(else_branch))
+            })
+            .boxed();
+
+        let conditional = if_expr.or(logical).boxed();
+
+        let abs_coord_spec = just(Token::Hash)
+            .ignore_then(coord_spec.clone())
             .boxed();
 
         let rel_coord = just(Token::At)
@@ -273,40 +365,98 @@ where
             .boxed();
 
         let assign = choice((
+            // Input range assignment: "A1:A5 := 10"
+            cell_range.clone()
+                .then_ignore(just(Token::ColonEq))
+                .then(conditional.clone())
+                .map(|(range, val)| Expr::InputRangeAssign(range, Box::new(val))),
+            // Input all-cells assignment: "tensor#[*] := expr"
+            tensor_all_coords.clone()
+                .then_ignore(just(Token::ColonEq))
+                .then(conditional.clone())
+                .map(|(name, val)| Expr::InputAssignAll(Some(name), Box::new(val))),
+            // Input all-cells assignment: "#[*] := expr"
+            all_coords.clone()
+                .then_ignore(just(Token::ColonEq))
+                .then(conditional.clone())
+                .map(|(_, val)| Expr::InputAssignAll(None, Box::new(val))),
+            // Input relative assignment: "@[dx,dy] := expr"
+            rel_coord.clone()
+                .then_ignore(just(Token::ColonEq))
+                .then(conditional.clone())
+                .map(|(coords, val)| Expr::InputAssignRel(coords, Box::new(val))),
+            // Input absolute assignment (with ranges): "#[0,0] := 10" or "#[4:6,2] := 1"
+            abs_coord_spec.clone()
+                .then_ignore(just(Token::ColonEq))
+                .then(conditional.clone())
+                .map(|(specs, val)| {
+                    let all_single = specs.iter().all(|s| matches!(s, IndexSpec::Single(_)));
+                    if all_single {
+                        let coords = specs
+                            .iter()
+                            .map(|s| match s {
+                                IndexSpec::Single(v) => *v,
+                                IndexSpec::Range(_, _) => 0,
+                            })
+                            .collect::<Vec<_>>();
+                        Expr::InputAssignAbs(coords, Box::new(val))
+                    } else {
+                        Expr::InputAssignAbsRange(specs, Box::new(val))
+                    }
+                }),
+            // Input regular assignment: "A1 := 10"
+            select! { Token::Ident(s) => s }
+                .then_ignore(just(Token::ColonEq))
+                .then(conditional.clone())
+                .map(|(id, val)| Expr::InputAssign(id, Box::new(val))),
             // Try range assignment first: "A1:A5 = 10"
-            cell_range
+            cell_range.clone()
                 .then_ignore(just(Token::Eq))
-                .then(logical.clone())
+                .then(conditional.clone())
                 .map(|(range, val)| Expr::RangeAssign(range, Box::new(val))),
             // All-cells assignment: "tensor#[*] = expr"
-            tensor_all_coords
+            tensor_all_coords.clone()
                 .then_ignore(just(Token::Eq))
-                .then(logical.clone())
+                .then(conditional.clone())
                 .map(|(name, val)| Expr::AssignAll(Some(name), Box::new(val))),
             // All-cells assignment: "#[*] = expr"
-            all_coords
+            all_coords.clone()
                 .then_ignore(just(Token::Eq))
-                .then(logical.clone())
+                .then(conditional.clone())
                 .map(|(_, val)| Expr::AssignAll(None, Box::new(val))),
             // Relative assignment: "@[dx,dy] = expr"
-            rel_coord
+            rel_coord.clone()
                 .then_ignore(just(Token::Eq))
-                .then(logical.clone())
+                .then(conditional.clone())
                 .map(|(coords, val)| Expr::AssignRel(coords, Box::new(val))),
-            // Absolute assignment: "#[0,0] = 10"
-            abs_coord
+            // Absolute assignment (with ranges): "#[0,0] = 10" or "#[4:6,2] = 1"
+            abs_coord_spec.clone()
                 .then_ignore(just(Token::Eq))
-                .then(logical.clone())
-                .map(|(coords, val)| Expr::AssignAbs(coords, Box::new(val))),
+                .then(conditional.clone())
+                .map(|(specs, val)| {
+                    let all_single = specs.iter().all(|s| matches!(s, IndexSpec::Single(_)));
+                    if all_single {
+                        let coords = specs
+                            .iter()
+                            .map(|s| match s {
+                                IndexSpec::Single(v) => *v,
+                                IndexSpec::Range(_, _) => 0,
+                            })
+                            .collect::<Vec<_>>();
+                        Expr::AssignAbs(coords, Box::new(val))
+                    } else {
+                        Expr::AssignAbsRange(specs, Box::new(val))
+                    }
+                }),
             // Fallback to regular assignment: "A1 = 10"
             select! { Token::Ident(s) => s }
                 .then_ignore(just(Token::Eq))
-                .then(logical.clone())
+                .then(conditional.clone())
                 .map(|(id, val)| Expr::Assign(id, Box::new(val))),
         ))
         .boxed();
 
-        assign.or(logical).boxed()
+        assign.or(conditional).boxed()
     })
     .boxed()
 }

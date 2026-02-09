@@ -34,29 +34,29 @@ Formula set for 1 cell (#[4,0])
 Tick processed.
 
 [Tick 1]
-#[0,0]: 10
-#[1,0]: true
-#[2,0]: true
-#[3,0]: 2
-#[4,0]: 100
-#[0,1]: false
-#[1,1]: false
-#[2,1]: false
-#[3,1]: 5
-#[0,2]: true
-#[2,2]: true
+#[0,0]: 10 (formula: 10)
+#[1,0]: true (formula: (5 == 5))
+#[2,0]: true (formula: (true && true))
+#[3,0]: 2 (formula: (1 && 2))
+#[4,0]: 100 (formula: (#[4,0] || 100))
+#[0,1]: false (formula: (#[0,0] > 5))
+#[1,1]: false (formula: (5 != 5))
+#[2,1]: false (formula: (true && false))
+#[3,1]: 5 (formula: (0 || 5))
+#[0,2]: true (formula: (#[0,0] < 5))
+#[2,2]: true (formula: (false || true))
 > tick
 Tick processed.
 
 [Tick 2]
-#[0,0]: 10
-#[1,0]: true
-#[2,0]: true
-#[3,0]: 2
-#[4,0]: 100
-#[0,1]: true
-#[1,1]: false
-#[2,1]: false
-#[3,1]: 5
-#[0,2]: false
-#[2,2]: true
+#[0,0]: 10 (formula: 10)
+#[1,0]: true (formula: (5 == 5))
+#[2,0]: true (formula: (true && true))
+#[3,0]: 2 (formula: (1 && 2))
+#[4,0]: 100 (formula: (#[4,0] || 100))
+#[0,1]: true (formula: (#[0,0] > 5))
+#[1,1]: false (formula: (5 != 5))
+#[2,1]: false (formula: (true && false))
+#[3,1]: 5 (formula: (0 || 5))
+#[0,2]: false (formula: (#[0,0] < 5))
+#[2,2]: true (formula: (false || true))
